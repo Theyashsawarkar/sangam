@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <title>sangam</title>
+  <!-- Two streams meet and flow on as one: a sangam (confluence), a merge. -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="128" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#cba6f7"/><stop offset="1" stop-color="#f5e0dc"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="78" cy="64" r="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#cba6f7" stop-opacity=".22"/><stop offset="1" stop-color="#cba6f7" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="2" y="2" width="124" height="124" rx="30" fill="#1e1e2e" stroke="#cba6f7" stroke-opacity=".28" stroke-width="2"/>
+  <rect x="2" y="2" width="124" height="124" rx="30" fill="url(#glow)"/>
+  <g fill="none" stroke="url(#g)" stroke-linecap="round" stroke-linejoin="round" stroke-width="8">
+    <path d="M28 38 C52 38 54 64 78 64"/>
+    <path d="M28 90 C52 90 54 64 78 64"/>
+    <path d="M78 64 H98"/>
+  </g>
+  <g fill="url(#g)">
+    <circle cx="28" cy="38" r="7"/>
+    <circle cx="28" cy="90" r="7"/>
+    <circle cx="100" cy="64" r="10"/>
+  </g>
+</svg>

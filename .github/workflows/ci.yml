@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: ShellCheck
+        run: shellcheck -S warning bin/sangam sangam.tmux install.sh
+      - name: Syntax and CLI
+        run: |
+          bash -n bin/sangam
+          ./bin/sangam --version
+          ./bin/sangam --help
+      - name: make install
+        run: |
+          make install DESTDIR="$RUNNER_TEMP/pkg" PREFIX=/usr
+          test -x "$RUNNER_TEMP/pkg/usr/bin/sangam"
+          test -f "$RUNNER_TEMP/pkg/usr/share/sangam/icon.png"

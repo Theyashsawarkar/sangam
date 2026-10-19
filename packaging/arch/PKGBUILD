@@ -1,0 +1,33 @@
+# Maintainer: theyashsawarkar <theyashsawarkar@gmail.com>
+# Builds sangam from the latest commit on main:
+#   cd packaging/arch && makepkg -si
+pkgname=sangam-git
+_pkgname=sangam
+pkgver=2.0.0
+pkgrel=1
+pkgdesc="Review and merge GitHub pull requests from the terminal (TUI over gh, fzf and tmux)"
+arch=('any')
+url="https://github.com/Theyashsawarkar/sangam"
+license=('MIT')
+depends=('bash' 'tmux' 'github-cli' 'fzf' 'jq' 'git' 'less' 'coreutils' 'grep' 'util-linux')
+optdepends=('bat: highlighted diffs and descriptions'
+            'libnotify: desktop notifications'
+            'wl-clipboard: copy links on Wayland'
+            'xclip: copy links on X11'
+            'ttf-nerd-fonts-symbols: icons')
+makedepends=('git')
+provides=("$_pkgname")
+conflicts=("$_pkgname")
+source=("$_pkgname::git+$url.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$_pkgname"
+  git describe --long --tags --abbrev=7 2>/dev/null | sed 's/^v//; s/\([^-]*-g\)/r\1/; s/-/./g' ||
+    printf 'r%s.%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+}
+
+package() {
+  cd "$_pkgname"
+  make DESTDIR="$pkgdir" PREFIX=/usr install
+}

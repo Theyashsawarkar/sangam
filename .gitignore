@@ -1,0 +1,5 @@
+# makepkg output (packaging/arch)
+packaging/arch/src/
+packaging/arch/pkg/
+packaging/arch/sangam/
+packaging/arch/*.pkg.tar.*

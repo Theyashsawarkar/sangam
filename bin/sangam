@@ -1,53 +1,55 @@
 #!/usr/bin/env bash
-# tmux-gh-pr: a pull request popup for tmux (prefix G by default, see
-# gh-pr.tmux): read, review, merge and close pull requests without opening
-# the browser, from anywhere.
-#   gh-pr.sh --session    (what the key binding runs)
+# sangam -- review and merge GitHub pull requests from the terminal.
+# https://github.com/Theyashsawarkar/sangam  (MIT)
+#
+#   sangam                 open it here (any terminal, inside tmux or not)
+#   sangam -C <dir>        open it as if started in <dir>
+#   sangam doctor          check the dependencies
+#   sangam --help | --version
 #
 # Sections, like gh-dash: each is a GitHub search across all repos, run as
-# one of your gh accounts, listed in ~/.config/gh-pr/sections (E edits it):
+# one of your gh accounts, listed in ~/.config/sangam/sections (E edits it):
 #   name | account | search            e.g.  Review requested | | review-requested:@me
-# An empty account means gh's active one. Opened inside a GitHub repo, the
-# popup adds a section for that repo too (its account: `git config
-# github.user`, set per folder with includeIf).
+# An empty account means gh's active one. Started inside a GitHub repo, a
+# section for that repo is added too (its account: `git config github.user`).
 #
-# Layout (L2): the popup runs its own small tmux session, gh-prs-<pid>:
-# a 3-line strip of section tabs on top (--strip) and fzf below (--main),
-# so the tabs span the list and the preview. The popup's key again
-# (gh-pr.tmux) kills that session, which closes the popup; ? opens a key
-# sheet as a popup of that session.
+# Layout: sangam runs a private tmux server (its own socket, no config of
+# yours) with one session: a 3-line strip of section tabs on top (--strip)
+# and fzf below (--main), so the tabs span both the list and the preview.
+# Quitting fzf kills the server. As a tmux popup (sangam.tmux runs it with
+# --popup), the popup's key (prefix G) kills it too.
 #
 # Vim-style: it opens in normal mode (letters are commands); / filters the
 # list, Enter or Esc leaves the filter.
 #
-# keybind: Tmux/PR popup | j / k | Move to the next / previous PR
-# keybind: Tmux/PR popup | g / G | Jump to the first / last PR
-# keybind: Tmux/PR popup | h / l | Switch to the previous / next section
-# keybind: Tmux/PR popup | 1 / 2 / 3 / 4 | Show the overview / diff / checks / comments
-# keybind: Tmux/PR popup | Tab | Cycle the preview (overview, diff, checks, comments)
-# keybind: Tmux/PR popup | J / K | Scroll the preview down / up
-# keybind: Tmux/PR popup | Ctrl+d / Ctrl+u | Scroll the preview half a page down / up
-# keybind: Tmux/PR popup | Enter | Open the current view full screen (failed check logs in checks)
-# keybind: Tmux/PR popup | / | Search PRs (Enter or Esc goes back to normal mode)
-# keybind: Tmux/PR popup | f | Cycle the state shown (open, merged, closed, all)
-# keybind: Tmux/PR popup | F | Toggle between open PRs and all of them
-# keybind: Tmux/PR popup | u | Switch the account (all, then each signed-in gh account)
-# keybind: Tmux/PR popup | s | Search GitHub within the section (author:x label:y...; empty clears)
-# keybind: Tmux/PR popup | R | Reload PRs from GitHub
-# keybind: Tmux/PR popup | S | Edit the sections: add, edit, delete, move, pin this repo
-# keybind: Tmux/PR popup | E | Edit the sections file (then reloads)
-# keybind: Tmux/PR popup | m | Merge the PR (squash, merge commit, rebase or auto-merge)
-# keybind: Tmux/PR popup | a | Approve the PR (optional message)
-# keybind: Tmux/PR popup | r | Request changes on the PR (message in your editor)
-# keybind: Tmux/PR popup | c | Add a comment to the PR (in your editor)
-# keybind: Tmux/PR popup | x | Close the PR (reopens a closed one)
-# keybind: Tmux/PR popup | o | Switch this repo to the PR's branch (gh pr checkout; inside its clone)
-# keybind: Tmux/PR popup | d | Toggle the PR between draft and ready for review
-# keybind: Tmux/PR popup | y | Copy the PR's link
-# keybind: Tmux/PR popup | b | Open the PR in the browser
-# keybind: Tmux/PR popup | ? | Show all keys (a popup; any key closes it)
-# keybind: Tmux/PR popup | q / Esc | Quit the PR popup
-# keybind: Tmux/PR popup | prefix G | Quit the PR popup (the popup's key toggles it)
+# keybind: Tmux/sangam | j / k | Move to the next / previous PR
+# keybind: Tmux/sangam | g / G | Jump to the first / last PR
+# keybind: Tmux/sangam | h / l | Switch to the previous / next section
+# keybind: Tmux/sangam | 1 / 2 / 3 / 4 | Show the overview / diff / checks / comments
+# keybind: Tmux/sangam | Tab | Cycle the preview (overview, diff, checks, comments)
+# keybind: Tmux/sangam | J / K | Scroll the preview down / up
+# keybind: Tmux/sangam | Ctrl+d / Ctrl+u | Scroll the preview half a page down / up
+# keybind: Tmux/sangam | Enter | Open the current view full screen (failed check logs in checks)
+# keybind: Tmux/sangam | / | Search PRs (Enter or Esc goes back to normal mode)
+# keybind: Tmux/sangam | f | Cycle the state shown (open, merged, closed, all)
+# keybind: Tmux/sangam | F | Toggle between open PRs and all of them
+# keybind: Tmux/sangam | u | Switch the account (all, then each signed-in gh account)
+# keybind: Tmux/sangam | s | Search GitHub within the section (author:x label:y...; empty clears)
+# keybind: Tmux/sangam | R | Reload PRs from GitHub
+# keybind: Tmux/sangam | S | Edit the sections: add, edit, delete, move, pin this repo
+# keybind: Tmux/sangam | E | Edit the sections file (then reloads)
+# keybind: Tmux/sangam | m | Merge the PR (squash, merge commit, rebase or auto-merge)
+# keybind: Tmux/sangam | a | Approve the PR (optional message)
+# keybind: Tmux/sangam | r | Request changes on the PR (message in your editor)
+# keybind: Tmux/sangam | c | Add a comment to the PR (in your editor)
+# keybind: Tmux/sangam | x | Close the PR (reopens a closed one)
+# keybind: Tmux/sangam | o | Switch this repo to the PR's branch (gh pr checkout; inside its clone)
+# keybind: Tmux/sangam | d | Toggle the PR between draft and ready for review
+# keybind: Tmux/sangam | y | Copy the PR's link
+# keybind: Tmux/sangam | b | Open the PR in the browser
+# keybind: Tmux/sangam | ? | Show all keys (a popup; any key closes it)
+# keybind: Tmux/sangam | q / Esc | Quit sangam
+# keybind: Tmux/sangam | prefix G | Quit sangam (as a tmux popup: the popup's key toggles it)
 
 self=$(readlink -f "$0")
 
@@ -67,8 +69,15 @@ b=$'\e[1m' r=$'\e[0m' key=$'\e[1;38;2;208;149;164m'
 
 STATES=(open merged closed all)
 NORMAL_KEYS='j,k,g,G,h,l,J,K,1,2,3,4,f,F,u,s,S,R,E,m,a,r,c,x,o,d,y,b,q,/,?'
-CONFIG=${XDG_CONFIG_HOME:-$HOME/.config}/gh-pr/sections
-CROOT=${XDG_CACHE_HOME:-$HOME/.cache}/gh-pr
+VERSION=2.0.0
+CONFIG=${XDG_CONFIG_HOME:-$HOME/.config}/sangam/sections
+CROOT=${XDG_CACHE_HOME:-$HOME/.cache}/sangam
+# Sections from before the rename (tmux-gh-pr) carry over once.
+OLD_CONFIG=${XDG_CONFIG_HOME:-$HOME/.config}/gh-pr/sections
+[ -f "$CONFIG" ] || [ ! -f "$OLD_CONFIG" ] || { mkdir -p "${CONFIG%/*}" && cp "$OLD_CONFIG" "$CONFIG"; }
+# The logo, for notifications: next to bin/ in a clone, share/ when installed.
+ICON=""
+for i in "${self%/*}/../assets/icon.png" "${self%/*}/../share/sangam/icon.png"; do [ -f "$i" ] && { ICON=$i; break; }; done
 
 # ------------------------------------------------------------------ data
 # Per PR (overview, checks, comments); the list comes from one search query.
@@ -89,7 +98,7 @@ token() { [ -n "$1" ] && gh auth token --user "$1" 2>/dev/null; }
 default_config() {
   mkdir -p "${CONFIG%/*}"
   cat >"$CONFIG" <<'EOF'
-# Sections of the tmux PR popup (tmux-gh-pr), one per line:
+# Sections of sangam, one per line:
 #   name | account | GitHub search (is:pr and the open/merged/closed state are added)
 # account: a gh account (`gh auth status`), or empty for the active one.
 # Several repo: filters in one search are OR'ed: repo:a/x repo:b/y
@@ -121,7 +130,7 @@ build_sections() {
   done <"$STATE/sections.tmp" >"$STATE/sections"
   [ -s "$STATE/sections" ] || printf 'nothing for %s\t%s\tauthor:@me\tnone\n' "$only" "$only" >"$STATE/sections"
   local last; last=$(cat "$CROOT/last-section" 2>/dev/null)
-  local i=$(awk -F'\t' -v n="$last" '$1 == n { print NR - 1; exit }' "$STATE/sections")
+  local i; i=$(awk -F'\t' -v n="$last" '$1 == n { print NR - 1; exit }' "$STATE/sections")
   echo "${i:-0}" >"$STATE/sec"
 }
 
@@ -137,9 +146,12 @@ fetch_list() {
   q=$(secf "$i" 3 | sed -E 's/(^| )(is:(open|closed|merged|unmerged)|state:[a-z]+)( |$)/ /g')
   [ "$i" = "$(sec)" ] && q+=" $(query)"
   case $(state) in open) st=is:open ;; merged) st=is:merged ;; closed) st='is:closed is:unmerged' ;; *) st= ;; esac
-  local f; f=$(listfile "$i"); mkdir -p "${f%/*}"
+  local f t; f=$(listfile "$i"); mkdir -p "${f%/*}"
+  # Own temp name (sections are fetched in parallel), built here: in a
+  # redirect, $BASHPID would expand in gh's forked process.
+  t=$f.$BASHPID
   GH_TOKEN=$(token "$(secf "$i" 2)") gh api graphql -f query="$SEARCH" -f q="is:pr archived:false $q $st sort:updated-desc" \
-    --jq '[.data.search.nodes[] | select(.number)]' >"$f.tmp" 2>"$STATE/err" && mv "$f.tmp" "$f"
+    --jq '[.data.search.nodes[] | select(.number)]' >"$t" 2>"$STATE/err" && mv -f "$t" "$f" || rm -f "$t"
 }
 
 # Every section's list, so the tabs can show counts (background, at start).
@@ -156,19 +168,21 @@ set_pr() {
   return 0
 }
 
+# The preview and the background prefetch can fetch the same PR at once:
+# each writes its own temp file ($BASHPID) and renames it into place.
 fetch_pr() {
-  local n=$1
-  gh pr view "$n" -R "$REPO" --json "$VIEW_FIELDS" >"$CACHE/$n.tmp" 2>/dev/null && mv "$CACHE/$n.tmp" "$CACHE/$n.json"
+  local n=$1 t=$CACHE/$1.$BASHPID
+  gh pr view "$n" -R "$REPO" --json "$VIEW_FIELDS" >"$t.json" 2>/dev/null && mv -f "$t.json" "$CACHE/$n.json" || rm -f "$t.json"
   [ "$2" = --quick ] && return
-  gh pr diff "$n" -R "$REPO" --color=never >"$CACHE/$n.diff.tmp" 2>/dev/null && mv "$CACHE/$n.diff.tmp" "$CACHE/$n.diff"
-  gh api "repos/$REPO/pulls/$n/comments" --paginate >"$CACHE/$n.rc.tmp" 2>/dev/null && mv "$CACHE/$n.rc.tmp" "$CACHE/$n.rc.json"
+  gh pr diff "$n" -R "$REPO" --color=never >"$t.diff" 2>/dev/null && mv -f "$t.diff" "$CACHE/$n.diff" || rm -f "$t.diff"
+  gh api "repos/$REPO/pulls/$n/comments" --paginate >"$t.rc" 2>/dev/null && mv -f "$t.rc" "$CACHE/$n.rc.json" || rm -f "$t.rc"
 }
 
 # Details for the first PRs of the section, a few at a time, in the background.
 prefetch() {
-  local done=$STATE/prefetched-$(sec)-$(state)
-  [ -e "$done" ] && return
-  touch "$done"
+  local marker; marker=$STATE/prefetched-$(sec)-$(state)
+  [ -e "$marker" ] && return
+  touch "$marker"
   jq -r '.[:12][] | "\(.repository.nameWithOwner)#\(.number)"' "$(listfile)" 2>/dev/null |
     xargs -r -P 4 -I{} "$self" --fetch-pr {} >/dev/null 2>&1
 }
@@ -269,7 +283,7 @@ view_overview() {
   IFS=$'\x1f' read -r st title who upd opened head base fork < <(jq -r "$JQ_DEFS"'
     [(if .state == "OPEN" and .isDraft then "DRAFT" else .state end), .title, .author.login,
      ago(.updatedAt), ago(.createdAt), .headRefName, .baseRefName, .isCrossRepository] | map(tostring) | join("\u001f")' "$j")
-  local bc; case $st in OPEN) bc=#9ED1A6 ;; DRAFT) bc=#9A9FAA ;; MERGED) bc=#C282CE ;; *) bc=#E87D7D ;; esac
+  local bc; case $st in OPEN) bc='#9ED1A6' ;; DRAFT) bc='#9A9FAA' ;; MERGED) bc='#C282CE' ;; *) bc='#E87D7D' ;; esac
 
   # header: repo #n, then the title (wrapped by words)
   echo
@@ -575,7 +589,7 @@ sections_menu() {
   esac
 }
 
-# ? : a popup of the gh-prs session (tmux draws its border and title)
+# ? : a popup of sangam's tmux session (tmux draws its border and title)
 # with every key, grouped; any key closes it.
 keysheet() {
   local -a L=("${dim}MOVE${r}"
@@ -587,7 +601,7 @@ keysheet() {
     "  ${key}J / K${r}    scroll preview" "  ${key}^d / ^u${r}  half a page" "  ${key}Enter${r}    full screen" "  ${key}b${r}        open in browser" "  ${key}y${r}        copy link")
   local -a A=("${dim}ACT${r}"
     "  ${key}m${r}  merge" "  ${key}a${r}  approve" "  ${key}r${r}  request changes" "  ${key}c${r}  comment" "  ${key}x${r}  close / reopen"
-    "  ${key}o${r}  checkout (in its clone)" "  ${key}d${r}  draft / ready" "  ${key}q${r}  quit (or prefix $(k=$(tmux show -gqv @gh-pr-key); echo "${k:-G}"))")
+    "  ${key}o${r}  checkout (in its clone)" "  ${key}d${r}  draft / ready" "  ${key}q${r}  quit${SANGAM_QUIT:+ (or $SANGAM_QUIT)}")
   local cw=36 i n=${#L[@]} top
   ((${#M[@]} > n)) && n=${#M[@]}; ((${#A[@]} > n)) && n=${#A[@]}
   plainlen() { local x; x=$(sed 's/\x1b\[[0-9;]*m//g' <<<"$1"); echo ${#x}; }
@@ -603,7 +617,7 @@ keysheet() {
 # Full-screen version of the current view; in checks, the failed jobs' logs.
 open_full() {
   local n=$1; [ -n "$n" ] || return
-  export FZF_PREVIEW_COLUMNS=$(tput cols)
+  FZF_PREVIEW_COLUMNS=$(tput cols); export FZF_PREVIEW_COLUMNS
   # Nerd Font icons are private-use code points; tell less they print.
   export LESSUTFCHARDEF=e000-f8ff:p,f0000-ffffd:p
   if [ "$(mode)" = checks ]; then
@@ -639,7 +653,7 @@ pause() { printf '\n%spress any key%s' "$dim" "$r"; read -rsn1; }
 ask() { local k; printf '%s' "$1" >&2; read -rsn1 k; echo >&2; printf '%s' "$k"; }
 # A desktop notification (notify-send), else a tmux message.
 notify() {
-  if command -v notify-send >/dev/null; then notify-send -a tmux -i utilities-terminal "PR #$1" "$2"
+  if command -v notify-send >/dev/null; then notify-send -a sangam -i "${ICON:-utilities-terminal}" "PR #$1" "$2"
   else tmux display-message "PR #$1: $2"; fi
 }
 # stdin to the clipboard: the first that works of Wayland, X11 and macOS,
@@ -661,7 +675,7 @@ header() {
 compose() {
   local f; f=$(mktemp --suffix=.md)
   printf '\n\n──── write above this line; leave it empty to cancel ────\n%s on #%s: %s\n' "$1" "$2" "$(jq -r .title "$CACHE/$2.json")" >"$f"
-  "${VISUAL:-${EDITOR:-nvim}}" "$f" </dev/tty >/dev/tty
+  "${VISUAL:-${EDITOR:-vi}}" "$f" </dev/tty >/dev/tty
   sed '/^──── write above this line/,$d' "$f"
   rm -f "$f"
 }
@@ -674,13 +688,13 @@ compose() {
 # when it conflicts, ready-for-review when it's a draft. It re-reads the
 # PR after each step, so update → auto-merge works in one sitting.
 #
-# keybind: Tmux/PR merge panel | s / m / r | Merge the PR: squash, merge commit or rebase (only the repo's allowed ones)
-# keybind: Tmux/PR merge panel | u | Update the branch with its base (when it's behind)
-# keybind: Tmux/PR merge panel | a | Set auto-merge on (merges once checks and reviews pass)
-# keybind: Tmux/PR merge panel | ! | Merge anyway as admin (bypass the branch rules)
-# keybind: Tmux/PR merge panel | d | Set the draft ready for review
-# keybind: Tmux/PR merge panel | o | Switch this repo to the PR's branch to resolve conflicts
-# keybind: Tmux/PR merge panel | q / Esc | Close the merge panel
+# keybind: Tmux/sangam merge panel | s / m / r | Merge the PR: squash, merge commit or rebase (only the repo's allowed ones)
+# keybind: Tmux/sangam merge panel | u | Update the branch with its base (when it's behind)
+# keybind: Tmux/sangam merge panel | a | Set auto-merge on (merges once checks and reviews pass)
+# keybind: Tmux/sangam merge panel | ! | Merge anyway as admin (bypass the branch rules)
+# keybind: Tmux/sangam merge panel | d | Set the draft ready for review
+# keybind: Tmux/sangam merge panel | o | Switch this repo to the PR's branch to resolve conflicts
+# keybind: Tmux/sangam merge panel | q / Esc | Close the merge panel
 spin() {  # spin <message> <command...>: run it with a spinner, keep its output in $OUT
   local f; f=$(mktemp); "${@:2}" >"$f" 2>&1 & local pid=$! i=0 c='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
   while kill -0 "$pid" 2>/dev/null; do printf '\r  %s%s%s %s' "$gold" "${c:i++%10:1}" "$r" "$1"; read -rt 0.1 <> <(:) 2>/dev/null || true; done
@@ -869,37 +883,132 @@ action() {
   fetch_pr "$n" --quick
 }
 
-# --session (prefix G's popup runs this): sections for this folder, then a
-# tmux session with the strip on top and fzf below, attached in the popup.
+# The session: sections for this folder, then a private tmux server (its
+# own socket in $STATE, -f /dev/null so no tmux config applies) with the
+# strip on top and fzf below, attached in this terminal. <popup-key>: run
+# as a tmux popup, whose key (with the outer tmux's prefix) closes it.
 open_session() {
-  local url name sock
+  local popup=$1 url sock quit=""
+  [ -t 0 ] && [ -t 1 ] || die "sangam needs a terminal."
+  check_core || exit 1
   url=$(git remote get-url origin 2>/dev/null); url=${url%.git}
   case $url in *github*) HERE=$(sed -E 's#.*[:/]([^/:]+/[^/]+)$#\1#' <<<"$url") ;; esac
   HERE_USER=$(git config --get github.user 2>/dev/null)
-  STATE=$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/gh-pr.XXXXXX")
+  STATE=$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/sangam.XXXXXX")
   mkdir -p "$CROOT/sections"
   export HERE HERE_USER STATE
   gh auth status 2>&1 | sed -n 's/.*Logged in to github.com account \([^ ]*\).*/\1/p' >"$STATE/accounts"
+  [ -s "$STATE/accounts" ] || { rm -rf "$STATE"; die "gh isn't signed in to github.com: run gh auth login"; }
   # The account picked with u last time (kept in ~/.cache across reboots),
   # if it's still signed in.
   local last; last=$(cat "$CROOT/last-account" 2>/dev/null)
   [ -n "$last" ] && grep -qixF "$last" "$STATE/accounts" && printf '%s' "$last" >"$STATE/acct"
   build_sections
   setsid -f "$self" --fetch-all >/dev/null 2>&1
-  # Same tmux server as the popup's client (works on a -L test server too).
-  sock=${TMUX%%,*} name=gh-prs-$$
-  local env=(-e "STATE=$STATE" -e "HERE=$HERE" -e "HERE_USER=$HERE_USER" -e "PATH=$PATH")
-  tmux -S "$sock" new-session -d -s "$name" -x "$(tput cols)" -y "$(tput lines)" -c "$PWD" "${env[@]}" "$self --main $name"
-  tmux -S "$sock" set -t "$name" status off \; set -t "$name" detach-on-destroy on \; \
-    set -w -t "$name" pane-border-lines spaces \; set -w -t "$name" pane-border-status off \; \
-    split-window -v -b -l 3 -t "$name" "${env[@]}" "$self --strip" \; last-pane -t "$name"
-  exec env -u TMUX tmux -S "$sock" attach -t "$name"
+
+  local prefix=None
+  if [ -n "$popup" ] && [ -n "$TMUX" ]; then
+    prefix=$(tmux show -gv prefix 2>/dev/null); prefix=${prefix:-C-b}
+    quit="$(keyname "$prefix") $popup"
+  fi
+  sock=$STATE/tmux.sock
+  local T=(tmux -S "$sock" -f /dev/null)
+  local env=(-e "STATE=$STATE" -e "HERE=$HERE" -e "HERE_USER=$HERE_USER" -e "SANGAM_QUIT=$quit")
+  env -u TMUX "${T[@]}" new-session -d -s sangam -x "$(tput cols)" -y "$(tput lines)" -c "$PWD" "${env[@]}" "$self --main"
+  "${T[@]}" set -g status off \; set -s escape-time 0 \; set -g default-terminal tmux-256color \; \
+    set -s 'terminal-features[0]' '*:RGB' \; set -g prefix "$prefix" \; set -g mouse off \; \
+    set -g pane-border-lines spaces \; set -g pane-border-status off \; \
+    split-window -v -b -l 3 -t sangam "${env[@]}" "$self --strip" \; last-pane -t sangam
+  [ -n "$quit" ] && "${T[@]}" bind-key "$popup" kill-server
+  env -u TMUX "${T[@]}" attach -t sangam
+  # tmux prints "[server exited]" on the way out; wipe it (a popup just closes).
+  [ -n "$popup" ] || printf '\e[1A\e[2K\r'
+  rm -rf "$STATE"
 }
 
-# --main: the list and preview; quitting ends the session (and the popup).
+# C-a -> Ctrl+a, M-x -> Alt+x (for the key sheet).
+keyname() { local k=$1; k=${k//C-/Ctrl+}; k=${k//M-/Alt+}; printf '%s' "$k"; }
+die() { printf 'sangam: %s\n' "$*" >&2; exit 1; }
+
+usage() {
+  cat <<USAGE
+sangam $VERSION -- review and merge GitHub pull requests from the terminal
+
+Usage:
+  sangam               open it in this folder (any terminal, in tmux or not)
+  sangam -C <dir>      open it as if started in <dir>
+  sangam doctor        check the dependencies and the GitHub sign-in
+  sangam --version     print the version
+  sangam --help        this help
+
+Inside: j/k move, h/l sections, 1-4 overview/diff/checks/comments,
+m merge, a approve, c comment, ? every key, q quit.
+
+Sections:  ${CONFIG/#$HOME/\~}
+Cache:     ${CROOT/#$HOME/\~}
+Docs:      https://github.com/Theyashsawarkar/sangam
+USAGE
+}
+
+# --- dependencies --------------------------------------------------------
+# ver <a> <b>: true when version a >= b
+ver() { [ "$(printf '%s\n%s\n' "$2" "$1" | sort -V | head -1)" = "$2" ]; }
+# The ones sangam can't start without (checked on every start, quietly).
+check_core() {
+  local miss=() c
+  for c in tmux gh fzf jq git; do command -v "$c" >/dev/null || miss+=("$c"); done
+  [ ${#miss[@]} -eq 0 ] && return 0
+  printf 'sangam: missing %s. Run sangam doctor for what to install.\n' "${miss[*]}" >&2
+  return 1
+}
+
+doctor() {
+  [ -t 1 ] || local green="" red="" gold="" dim="" b="" r=""
+  local ok="${green}✓$r" no="${red}✗$r" warn="${gold}!$r" bad=0 v
+  row() { printf '  %s %-13s %s\n' "$1" "$2" "$3"; }
+  need() {  # need <cmd> <min> <version-cmd> <hint>
+    if ! command -v "$1" >/dev/null; then row "$no" "$1" "${red}not installed$r  $dim$4$r"; bad=1; return; fi
+    v=$(eval "$3" 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)*' | head -1)
+    if [ -n "$2" ] && ! ver "${v:-0}" "$2"; then row "$no" "$1" "${red}$v, needs $2+$r  $dim$4$r"; bad=1
+    else row "$ok" "$1" "${v:-found}"; fi
+  }
+  printf '\n  %ssangam %s%s\n\n  %srequired%s\n' "$b" "$VERSION" "$r" "$dim" "$r"
+  if ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 4))); then row "$ok" bash "$BASH_VERSION"
+  else row "$no" bash "${red}$BASH_VERSION, needs 4.4+$r"; bad=1; fi
+  need tmux 3.3 "tmux -V" "the layout runs on a private tmux server"
+  need gh 2.40 "gh --version" "https://cli.github.com"
+  need fzf 0.66 "fzf --version" "https://github.com/junegunn/fzf"
+  need jq 1.6 "jq --version" ""
+  need git "" "git --version" ""
+  need less "" "less --version" ""
+  local gnu=1
+  { md5sum </dev/null && stat -c %Y / && mktemp -u --suffix=.x; } >/dev/null 2>&1 || gnu=0
+  echo x | grep -qP 'x' 2>/dev/null || gnu=0
+  command -v setsid >/dev/null || gnu=0
+  if ((gnu)); then row "$ok" "GNU tools" "coreutils, grep -P, setsid"
+  else row "$no" "GNU tools" "${red}needs GNU coreutils, GNU grep (-P) and setsid (util-linux)$r"; bad=1; fi
+  printf '\n  %sGitHub%s\n' "$dim" "$r"
+  local accts
+  accts=$(gh auth status 2>&1 | sed -n 's/.*Logged in to github.com account \([^ ]*\).*/\1/p' | paste -sd, - | sed 's/,/, /g')
+  if [ -n "$accts" ]; then row "$ok" "signed in" "$accts"
+  else row "$no" "signed in" "${red}no github.com account$r  ${dim}gh auth login$r"; bad=1; fi
+  printf '\n  %soptional%s\n' "$dim" "$r"
+  if command -v bat >/dev/null; then row "$ok" bat "highlighted diffs and descriptions"
+  else row "$warn" bat "${dim}not installed: diffs and descriptions show uncolored$r"; fi
+  if command -v notify-send >/dev/null; then row "$ok" notify-send "desktop notifications"
+  else row "$warn" notify-send "${dim}not installed: notices go to tmux's message line$r"; fi
+  local c; for c in wl-copy xclip pbcopy; do command -v $c >/dev/null && break; c=""; done
+  if [ -n "$c" ]; then row "$ok" clipboard "$c"
+  else row "$warn" clipboard "${dim}no wl-copy/xclip/pbcopy: y copies into tmux's buffer$r"; fi
+  row "$warn" "Nerd Font" "${dim}icons need a Nerd Font in your terminal (can't be checked from here)$r"
+  if ((bad)); then printf '\n  %s fix the ✗ lines above\n\n' "$no"; else printf '\n  %s ready: run sangam\n\n' "$ok"; fi
+  return $bad
+}
+
+# --main: the list and preview; quitting ends sangam (and the popup).
 run_main() {
-  local name=$1
-  trap 'rm -rf "$STATE"; tmux kill-session -t "$name" 2>/dev/null' EXIT
+  # Quitting fzf ends sangam: its private tmux server goes with it.
+  trap 'tmux kill-server 2>/dev/null' EXIT
   normal="hide-input+rebind($NORMAL_KEYS)"
   # esc/enter use transform:CMD (to the end of the binding), not transform(CMD):
   # fzf ends the latter at the first ")", which is inside rebind(...).
@@ -954,8 +1063,7 @@ case $1 in
   --keys) keysheet; exit ;;
   --sections-menu) sections_menu; exit ;;
   --strip) strip; exit ;;
-  --main) run_main "$2"; exit ;;
-  --session) open_session; exit ;;
+  --main) run_main; exit ;;
   --show-keys)
     tmux display-popup -E -w 116 -h 15 -b rounded -S "fg=#D095A4" -T "#[fg=#D095A4] keys #[fg=#6C7086]· any key closes " \
       "STATE='$STATE' '$self' --keys"; exit ;;
@@ -976,7 +1084,7 @@ case $1 in
     printf '%s' "$q" >"$STATE/query"; rm -f "$STATE/fresh"; exit ;;
   --mode) echo "$2" >"$STATE/mode"; exit ;;
   --next-mode)
-    case $(mode) in overview) m=diff ;; diff) m=checks ;; checks) m=comments ;; *) m=overview ;; esac
+    case $(mode) in overview) m='diff' ;; diff) m='checks' ;; checks) m='comments' ;; *) m='overview' ;; esac
     echo "$m" >"$STATE/mode"; exit ;;
   --next-state)
     cur=$(state) nxt=${STATES[0]}
@@ -987,7 +1095,7 @@ case $1 in
     secf "$(sec)" 1 >"$CROOT/last-section"; exit ;;
   --edit)
     [ -f "$CONFIG" ] || default_config
-    "${VISUAL:-${EDITOR:-nvim}}" "$CONFIG" </dev/tty >/dev/tty
+    "${VISUAL:-${EDITOR:-vi}}" "$CONFIG" </dev/tty >/dev/tty
     build_sections; rm -f "$STATE/fresh"; setsid -f "$self" --fetch-all >/dev/null 2>&1; exit ;;
   --fetch-all) fetch_all; exit ;;
   --fetch-pr) set_pr "$2" && fetch_pr "$N"; exit ;;
@@ -1008,4 +1116,17 @@ case $1 in
   --full) set_pr "$2" && open_full "$N"; exit ;;
 esac
 
-open_session
+# ------------------------------------------------------------------ CLI
+popup=""
+while [ $# -gt 0 ]; do
+  case $1 in
+    -h | --help) usage; exit 0 ;;
+    -V | --version) echo "sangam $VERSION"; exit 0 ;;
+    doctor) doctor; exit ;;
+    -C) [ -n "$2" ] || die "-C needs a directory"; cd "$2" || exit 1; shift 2 ;;
+    --popup) popup=${2:-G}; shift 2 ;;
+    --session) shift ;;   # tmux-gh-pr's old entry point
+    *) printf 'sangam: unknown option %s\n\n' "$1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+open_session "$popup"

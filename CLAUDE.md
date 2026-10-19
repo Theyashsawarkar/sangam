@@ -1,22 +1,32 @@
-# tmux-gh-pr -- notes for agents
+# sangam -- notes for agents
 
-A standalone tmux plugin (TPM), pulled into Vayu
-(github.com/Theyashsawarkar/vayu) by its tmux.conf. Keep it working on a
-stock tmux without Vayu: no hardcoded paths, Vayu-specific behaviour only
-through options (`@gh-pr-*`, see gh-pr.tmux and the README).
+A terminal UI for GitHub pull requests: one Bash script (`bin/sangam`)
+over gh, fzf and tmux. Usable three ways, all from this repo: the `sangam`
+command (install.sh, make install, packaging/arch), and a TPM plugin
+(`sangam.tmux` binds a popup key). It is pulled into Vayu
+(github.com/Theyashsawarkar/vayu) as a tmux plugin, but must work on any
+Linux setup without Vayu: no hardcoded paths, Vayu-specific behaviour only
+through the `@sangam-*` options.
 
-- `gh-pr.tmux` binds the key; `scripts/gh-pr.sh` is everything else (it
-  calls itself with `--strip`, `--main`, `--preview`... for each part).
-- Every key inside the popup has a `# keybind: Tmux/PR popup | <keys> |
-  <Verb> ...` line in the script header: Vayu's keybinding search reads
-  them. Add, change or remove that line with the key, and update the
-  README's key table and the `?` key sheet (`keysheet()`).
-- Every change gets a CHANGELOG.md entry; releases are tags (`vX.Y.Z`).
-- Test on an isolated tmux server, never the live one: a bare one
-  (`tmux -L t -f /dev/null`, then `run-shell .../gh-pr.tmux`) and Vayu's
-  config. Drive it from an outer server so the popup has a client:
-  `tmux -L outer -f /dev/null new -d -s o -x 200 -y 50 "env -u TMUX tmux -L inner -f /dev/null new -A -s main"`,
-  `tmux -L inner run-shell $PWD/gh-pr.tmux`, `tmux -L outer send-keys -t o C-b G`,
-  `tmux -L outer capture-pane -p -t o`.
-- Theyashsawarkar/pr-playground is a test repo with one PR per merge
-  situation (clean, conflicting, behind, failing CI, draft, needs review).
+- `bin/sangam` calls itself for every part (`--strip`, `--main`,
+  `--preview`, `--action`...); the internal flags are dispatched in the
+  first `case` near the end, the CLI (`doctor`, `-C`, `--popup`...) after
+  it. The layout runs on a private tmux server (`$STATE/tmux.sock`).
+- Every key has a `# keybind: Tmux/sangam | <keys> | <Verb> ...` line in
+  the script header (Vayu's keybinding search reads them). Add, change or
+  remove that line with the key, and update the README's key tables and
+  the `?` key sheet (`keysheet()`).
+- The README documents every feature, key, option and dependency: a
+  change to any of them updates it. Every change gets a CHANGELOG.md
+  entry; releases are tags (`vX.Y.Z`) with `VERSION` in bin/sangam and
+  `pkgver` in packaging/arch/PKGBUILD bumped to match.
+- `make check` must pass (ShellCheck at warning level, syntax, CLI).
+- Test on throwaway tmux servers, never the user's live one. Standalone:
+  `tmux -L t -f /dev/null new -d -s o -x 180 -y 44 "env -u TMUX bin/sangam"`,
+  then `tmux -L t send-keys -t o ...` / `capture-pane -p -t o`. Popup:
+  an outer server running `tmux -L inner -f /dev/null`, then
+  `tmux -L inner run-shell $PWD/sangam.tmux` and `send-keys C-b G`.
+  Quitting must leave no `$XDG_RUNTIME_DIR/sangam.*` dir and no server.
+- Theyashsawarkar/pr-playground is a public test repo with one PR per
+  merge situation. Screenshots (assets/screenshots) are taken with a
+  sections file that only searches it, so no private PRs leak into them.
