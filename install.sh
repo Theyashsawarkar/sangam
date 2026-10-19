@@ -62,4 +62,4 @@ case ":$PATH:" in
 esac
 
 say "Checking the dependencies (sangam doctor):"
-"$DIR/bin/sangam" doctor || say "Install what's marked ✗ above, then run: sangam"
+"$DIR/bin/sangam" doctor || say "Fix what's marked ✗ above, then run: sangam"
