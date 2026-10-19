@@ -1,0 +1,1011 @@
+#!/usr/bin/env bash
+# tmux-gh-pr: a pull request popup for tmux (prefix G by default, see
+# gh-pr.tmux): read, review, merge and close pull requests without opening
+# the browser, from anywhere.
+#   gh-pr.sh --session    (what the key binding runs)
+#
+# Sections, like gh-dash: each is a GitHub search across all repos, run as
+# one of your gh accounts, listed in ~/.config/gh-pr/sections (E edits it):
+#   name | account | search            e.g.  Review requested | | review-requested:@me
+# An empty account means gh's active one. Opened inside a GitHub repo, the
+# popup adds a section for that repo too (its account: `git config
+# github.user`, set per folder with includeIf).
+#
+# Layout (L2): the popup runs its own small tmux session, gh-prs-<pid>:
+# a 3-line strip of section tabs on top (--strip) and fzf below (--main),
+# so the tabs span the list and the preview. The popup's key again
+# (gh-pr.tmux) kills that session, which closes the popup; ? opens a key
+# sheet as a popup of that session.
+#
+# Vim-style: it opens in normal mode (letters are commands); / filters the
+# list, Enter or Esc leaves the filter.
+#
+# keybind: Tmux/PR popup | j / k | Move to the next / previous PR
+# keybind: Tmux/PR popup | g / G | Jump to the first / last PR
+# keybind: Tmux/PR popup | h / l | Switch to the previous / next section
+# keybind: Tmux/PR popup | 1 / 2 / 3 / 4 | Show the overview / diff / checks / comments
+# keybind: Tmux/PR popup | Tab | Cycle the preview (overview, diff, checks, comments)
+# keybind: Tmux/PR popup | J / K | Scroll the preview down / up
+# keybind: Tmux/PR popup | Ctrl+d / Ctrl+u | Scroll the preview half a page down / up
+# keybind: Tmux/PR popup | Enter | Open the current view full screen (failed check logs in checks)
+# keybind: Tmux/PR popup | / | Search PRs (Enter or Esc goes back to normal mode)
+# keybind: Tmux/PR popup | f | Cycle the state shown (open, merged, closed, all)
+# keybind: Tmux/PR popup | F | Toggle between open PRs and all of them
+# keybind: Tmux/PR popup | u | Switch the account (all, then each signed-in gh account)
+# keybind: Tmux/PR popup | s | Search GitHub within the section (author:x label:y...; empty clears)
+# keybind: Tmux/PR popup | R | Reload PRs from GitHub
+# keybind: Tmux/PR popup | S | Edit the sections: add, edit, delete, move, pin this repo
+# keybind: Tmux/PR popup | E | Edit the sections file (then reloads)
+# keybind: Tmux/PR popup | m | Merge the PR (squash, merge commit, rebase or auto-merge)
+# keybind: Tmux/PR popup | a | Approve the PR (optional message)
+# keybind: Tmux/PR popup | r | Request changes on the PR (message in your editor)
+# keybind: Tmux/PR popup | c | Add a comment to the PR (in your editor)
+# keybind: Tmux/PR popup | x | Close the PR (reopens a closed one)
+# keybind: Tmux/PR popup | o | Switch this repo to the PR's branch (gh pr checkout; inside its clone)
+# keybind: Tmux/PR popup | d | Toggle the PR between draft and ready for review
+# keybind: Tmux/PR popup | y | Copy the PR's link
+# keybind: Tmux/PR popup | b | Open the PR in the browser
+# keybind: Tmux/PR popup | ? | Show all keys (a popup; any key closes it)
+# keybind: Tmux/PR popup | q / Esc | Quit the PR popup
+# keybind: Tmux/PR popup | prefix G | Quit the PR popup (the popup's key toggles it)
+
+self=$(readlink -f "$0")
+
+# tmux's server is started by systemd, without the login shell's PATH, so
+# a Homebrew gh (zshrc's `brew shellenv`) isn't found from a popup.
+if ! command -v gh >/dev/null; then
+  for d in /home/linuxbrew/.linuxbrew/bin "$HOME/.linuxbrew/bin" /opt/homebrew/bin; do
+    [ -x "$d/gh" ] && { PATH=$d:$PATH; break; }
+  done
+  export PATH
+fi
+
+rose=$'\e[38;2;208;149;164m' gold=$'\e[38;2;212;178;92m' dim=$'\e[38;2;108;112;134m'
+fg=$'\e[38;2;215;221;230m' sub=$'\e[38;2;154;159;170m' green=$'\e[38;2;158;209;166m'
+red=$'\e[38;2;232;125;125m' blue=$'\e[38;2;108;142;191m' purple=$'\e[38;2;194;130;206m'
+b=$'\e[1m' r=$'\e[0m' key=$'\e[1;38;2;208;149;164m'
+
+STATES=(open merged closed all)
+NORMAL_KEYS='j,k,g,G,h,l,J,K,1,2,3,4,f,F,u,s,S,R,E,m,a,r,c,x,o,d,y,b,q,/,?'
+CONFIG=${XDG_CONFIG_HOME:-$HOME/.config}/gh-pr/sections
+CROOT=${XDG_CACHE_HOME:-$HOME/.cache}/gh-pr
+
+# ------------------------------------------------------------------ data
+# Per PR (overview, checks, comments); the list comes from one search query.
+VIEW_FIELDS=number,title,author,headRefName,baseRefName,isDraft,additions,deletions,changedFiles,createdAt,updatedAt,mergedAt,closedAt,reviewDecision,state,url,isCrossRepository,labels,statusCheckRollup,body,comments,files,latestReviews,reviews,reviewRequests,mergeable,mergeStateStatus,assignees
+SEARCH='query($q: String!) { search(query: $q, type: ISSUE, first: 50) { nodes { ... on PullRequest {
+  number title url state isDraft additions deletions changedFiles updatedAt reviewDecision
+  headRefName baseRefName isCrossRepository author { login } repository { nameWithOwner }
+  labels(first: 6) { nodes { name } } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }'
+
+state() { cat "$STATE/state" 2>/dev/null || echo open; }
+mode() { cat "$STATE/mode" 2>/dev/null || echo overview; }
+sec() { cat "$STATE/sec" 2>/dev/null || echo 0; }
+nsec() { grep -c . "$STATE/sections"; }
+# Field of section <i>: 1 name, 2 account, 3 search, 4 cache id
+secf() { awk -F'\t' -v i="$(( $1 + 1 ))" -v f="$2" 'NR == i { print $f }' "$STATE/sections"; }
+token() { [ -n "$1" ] && gh auth token --user "$1" 2>/dev/null; }
+
+default_config() {
+  mkdir -p "${CONFIG%/*}"
+  cat >"$CONFIG" <<'EOF'
+# Sections of the tmux PR popup (tmux-gh-pr), one per line:
+#   name | account | GitHub search (is:pr and the open/merged/closed state are added)
+# account: a gh account (`gh auth status`), or empty for the active one.
+# Several repo: filters in one search are OR'ed: repo:a/x repo:b/y
+Review requested | | review-requested:@me
+My PRs           | | author:@me
+Involved         | | involves:@me -author:@me
+EOF
+}
+
+acct() { cat "$STATE/acct" 2>/dev/null; }
+query() { cat "$STATE/query" 2>/dev/null; }
+
+# Sections for this run: the config, plus the repo the popup was opened in,
+# narrowed to one account when u picked one.
+build_sections() {
+  [ -f "$CONFIG" ] || default_config
+  sed -e 's/#.*//' "$CONFIG" | awk -F'|' 'NF >= 3 {
+      for (i = 1; i <= 3; i++) gsub(/^[ \t]+|[ \t]+$/, "", $i)
+      if ($1 != "") print $1 "\t" $2 "\t" $3 }' >"$STATE/sections.tmp"
+  if [ -n "$HERE" ] && ! grep -qP "\trepo:\Q$HERE\E\s*$" "$STATE/sections.tmp"; then
+    printf '%s\t%s\t%s\n' "${HERE#*/} (here)" "$HERE_USER" "repo:$HERE" >>"$STATE/sections.tmp"
+  fi
+  local only; only=$(acct)
+  while IFS=$'\t' read -r n a q; do
+    # A section with no account belongs to every account.
+    if [ -n "$only" ] && [ -n "$a" ] && [ "${a,,}" != "${only,,}" ]; then continue; fi
+    [ -n "$only" ] && [ -z "$a" ] && a=$only
+    printf '%s\t%s\t%s\t%s\n' "$n" "$a" "$q" "$(printf '%s|%s' "$a" "$q" | md5sum | cut -c1-10)"
+  done <"$STATE/sections.tmp" >"$STATE/sections"
+  [ -s "$STATE/sections" ] || printf 'nothing for %s\t%s\tauthor:@me\tnone\n' "$only" "$only" >"$STATE/sections"
+  local last; last=$(cat "$CROOT/last-section" 2>/dev/null)
+  local i=$(awk -F'\t' -v n="$last" '$1 == n { print NR - 1; exit }' "$STATE/sections")
+  echo "${i:-0}" >"$STATE/sec"
+}
+
+# A search (s) is per popup: its results live in $STATE, not the cache.
+listfile() {
+  local i=${1:-$(sec)} q; q=$(query)
+  if [ -n "$q" ] && [ "$i" = "$(sec)" ]; then echo "$STATE/q-$(secf "$i" 4)-$(state)-$(printf '%s' "$q" | md5sum | cut -c1-8).json"
+  else echo "$CROOT/sections/$(secf "$i" 4)-$(state).json"; fi
+}
+
+fetch_list() {
+  local i=${1:-$(sec)} q st
+  q=$(secf "$i" 3 | sed -E 's/(^| )(is:(open|closed|merged|unmerged)|state:[a-z]+)( |$)/ /g')
+  [ "$i" = "$(sec)" ] && q+=" $(query)"
+  case $(state) in open) st=is:open ;; merged) st=is:merged ;; closed) st='is:closed is:unmerged' ;; *) st= ;; esac
+  local f; f=$(listfile "$i"); mkdir -p "${f%/*}"
+  GH_TOKEN=$(token "$(secf "$i" 2)") gh api graphql -f query="$SEARCH" -f q="is:pr archived:false $q $st sort:updated-desc" \
+    --jq '[.data.search.nodes[] | select(.number)]' >"$f.tmp" 2>"$STATE/err" && mv "$f.tmp" "$f"
+}
+
+# Every section's list, so the tabs can show counts (background, at start).
+fetch_all() { local i; for ((i = 0; i < $(nsec); i++)); do fetch_list "$i" & done; wait; }
+
+# A PR is "owner/repo#number"; this points REPO, N, CACHE and the token at it.
+set_pr() {
+  local id=${1%%[[:space:]]*}   # fzf's {1} keeps the trailing tab
+  [[ $id == */*#* ]] || return 1
+  REPO=${id%#*} N=${id##*#} CACHE=$CROOT/${REPO//\//_}
+  mkdir -p "$CACHE"
+  local t; t=$(token "$(secf "$(sec)" 2)")
+  [ -n "$t" ] && export GH_TOKEN=$t   # else gh's active account
+  return 0
+}
+
+fetch_pr() {
+  local n=$1
+  gh pr view "$n" -R "$REPO" --json "$VIEW_FIELDS" >"$CACHE/$n.tmp" 2>/dev/null && mv "$CACHE/$n.tmp" "$CACHE/$n.json"
+  [ "$2" = --quick ] && return
+  gh pr diff "$n" -R "$REPO" --color=never >"$CACHE/$n.diff.tmp" 2>/dev/null && mv "$CACHE/$n.diff.tmp" "$CACHE/$n.diff"
+  gh api "repos/$REPO/pulls/$n/comments" --paginate >"$CACHE/$n.rc.tmp" 2>/dev/null && mv "$CACHE/$n.rc.tmp" "$CACHE/$n.rc.json"
+}
+
+# Details for the first PRs of the section, a few at a time, in the background.
+prefetch() {
+  local done=$STATE/prefetched-$(sec)-$(state)
+  [ -e "$done" ] && return
+  touch "$done"
+  jq -r '.[:12][] | "\(.repository.nameWithOwner)#\(.number)"' "$(listfile)" 2>/dev/null |
+    xargs -r -P 4 -I{} "$self" --fetch-pr {} >/dev/null 2>&1
+}
+
+# ------------------------------------------------------------------ list
+JQ_DEFS='
+def ci: (.statusCheckRollup // []) as $c
+  | if ($c | length) == 0 then "none"
+    elif any($c[]; ((.conclusion // .state // "") | test("FAILURE|ERROR|TIMED_OUT|CANCELLED|ACTION_REQUIRED|STARTUP_FAILURE"))) then "fail"
+    elif any($c[]; ((.status // "COMPLETED") != "COMPLETED") or ((.state // "") | test("PENDING|EXPECTED"))) then "pending"
+    else "pass" end;
+def ago(t): (now - (t | fromdateiso8601)) as $s
+  | if $s < 3600 then "\($s / 60 | floor)m" elif $s < 86400 then "\($s / 3600 | floor)h"
+    elif $s < 604800 then "\($s / 86400 | floor)d" elif $s < 2592000 then "\($s / 604800 | floor)w"
+    else "\($s / 2592000 | floor)mo" end;
+'
+
+ci_icon() { case $1 in pass) echo "${green}✓" ;; fail) echo "${red}✗" ;; pending) echo "${gold}●" ;; *) echo "${dim}·" ;; esac; }
+rev_icon() { case $1 in APPROVED) echo "${green}✔" ;; CHANGES_REQUESTED) echo "${red}✎" ;; REVIEW_REQUIRED) echo "${dim}○" ;; *) echo " " ;; esac; }
+
+# <text> padded or cut (with …) to <width> characters
+fit() { local t=$1 w=$2; ((${#t} > w)) && t="${t:0:w-1}…"; printf '%s%*s' "$t" $((w - ${#t})) ''; }
+
+# Table widths: the list gets 58% of the popup; the title takes what the
+# fixed columns leave (# · title · author · age · +/-). Repo, CI and review
+# state are in the preview's header, not here.
+TW_NUM=6 TW_AUTHOR=14
+title_width() {
+  local w=$(( ${FZF_COLUMNS:-$(tput cols 2>/dev/null || echo 160)} * 58 / 100 - 9 ))
+  w=$(( w - 2 - TW_NUM - TW_AUTHOR - 1 - 4 - 13 ))
+  echo $(( w < 20 ? 20 : w ))
+}
+
+# Column headings: the list's first line (fzf --header-lines 1), so they
+# sit inside the list box, aligned with the rows.
+colhead() {
+  printf '%s %s %s %s %s  %s%s' "$dim" "$(fit '#' $TW_NUM)" "$(fit title "$(title_width)")" \
+    "$(fit author $TW_AUTHOR)" "age" "$(printf '%5s %-5s' '+' '−')" "$r"
+}
+
+# One line per PR: owner/repo#number <TAB> row.
+list() {
+  local file tw st_shown; file=$(listfile); st_shown=$(state)
+  [ -s "$file" ] || { [ "$1" = --cached ] && { printf '\t%s\n' "$(colhead)"; return; }; fetch_list; }
+  # Same columns in every section and state, so the headings never move.
+  tw=$(title_width)
+  printf '\t%s\n' "$(colhead)"
+  [ -s "$file" ] || return
+  jq -r "$JQ_DEFS"'.[] | [.repository.nameWithOwner, .number, .title, .author.login, .additions, .deletions,
+      .isDraft, ago(.updatedAt), .state] | map(tostring) | join("\u001f")' "$file" |
+  while IFS=$'\x1f' read -r repo n title author add del draft age st; do
+    # A merged/closed tag only in "all"; elsewhere the state is the filter.
+    local tag="" tl=0
+    [ "$draft" = true ] && tag="draft " tl=6
+    [ "$st_shown" = all ] && [ "$st" = MERGED ] && tag="merged " tl=7
+    [ "$st_shown" = all ] && [ "$st" = CLOSED ] && tag="closed " tl=7
+    case $st in MERGED) tag="$purple$tag" ;; CLOSED) tag="$red$tag" ;; *) tag="$dim$tag" ;; esac
+    printf '%s#%s\t %s%s %s%s%s%s %s%s %s%3s  %s%5s %s%-5s%s\n' "$repo" "$n" \
+      "$gold$b" "$(fit "#$n" $TW_NUM)" "$r" "$tag" "$fg" "$(fit "$title" $((tw - tl)))" "$sub" "$(fit "$author" $TW_AUTHOR)" \
+      "$dim" "$age" "$green" "+$add" "$red" "−$del" "$r"
+  done
+}
+
+# ------------------------------------------------------------------ views
+cols() { echo "${FZF_PREVIEW_COLUMNS:-$(tput cols 2>/dev/null || echo 100)}"; }
+rule() { local w; w=$(( $(cols) - 2 )); printf '%s── %s %s%s\n' "$dim" "$1" "$(printf '─%.0s' $(seq 1 $(( w > ${#1} + 4 ? w - ${#1} - 4 : 1 ))))" "$r"; }
+# Capsule like the tmux status bar: badge <hex bg> <text>
+badge() {
+  local h=${1#\#} bg; bg="$((16#${h:0:2}));$((16#${h:2:2}));$((16#${h:4:2}))"
+  printf '\e[38;2;%sm\e[0m\e[48;2;%sm\e[38;2;11;14;20m\e[1m%s\e[0m\e[38;2;%sm\e[0m' "$bg" "$bg" "$2" "$bg"
+}
+# GitHub-style change bar: <added> <deleted> <width>: green/red share, gray rest
+bar() {
+  local a=$1 d=$2 w=${3:-5} t ga gd i out=""
+  t=$((a + d)); [ "$t" -gt 0 ] || { printf '%s%s%s' "$dim" "$(printf '▪%.0s' $(seq 1 "$w"))" "$r"; return; }
+  ga=$(( (a * w + t / 2) / t )); gd=$(( w - ga ))
+  [ "$a" -gt 0 ] && [ "$ga" -eq 0 ] && { ga=1; gd=$((w - 1)); }
+  [ "$d" -gt 0 ] && [ "$gd" -eq 0 ] && { gd=1; ga=$((w - 1)); }
+  for ((i = 0; i < ga; i++)); do out+="${green}▪"; done
+  for ((i = 0; i < gd; i++)); do out+="${red}▪"; done
+  printf '%s%s' "$out" "$r"
+}
+# Markdown, wrapped by words first (bat would cut words), then colored.
+md() { fold -s -w "$(( $(cols) - 3 ))" | bat -l md --color=always --style=plain --paging=never --wrap=never 2>/dev/null || cat; }
+
+need_pr() {
+  [ -s "$CACHE/$1.json" ] || fetch_pr "$1"
+  [ -s "$CACHE/$1.json" ] || { echo "${red}Couldn't load #$1 from GitHub.$r"; return 1; }
+}
+
+# Overview: who/what/where on top, then status (merge, CI, reviews, size,
+# labels), files, description, activity. Every label is in one column;
+# long paths are shortened in the middle instead of wrapping.
+view_overview() {
+  local n=$1 j=$CACHE/$1.json W; W=$(cols)
+  need_pr "$n" || return
+  local st title who upd opened head base fork
+  IFS=$'\x1f' read -r st title who upd opened head base fork < <(jq -r "$JQ_DEFS"'
+    [(if .state == "OPEN" and .isDraft then "DRAFT" else .state end), .title, .author.login,
+     ago(.updatedAt), ago(.createdAt), .headRefName, .baseRefName, .isCrossRepository] | map(tostring) | join("\u001f")' "$j")
+  local bc; case $st in OPEN) bc=#9ED1A6 ;; DRAFT) bc=#9A9FAA ;; MERGED) bc=#C282CE ;; *) bc=#E87D7D ;; esac
+
+  # header: repo #n, then the title (wrapped by words)
+  echo
+  printf ' %s %s%s  %s#%s%s\n' "$blue" "$REPO" "$r" "$gold$b" "$n" "$r"
+  fold -s -w $(( W - 3 )) <<<"$title" | sed "s/^/ $fg$b/; s/\$/$r/"
+  echo
+  printf ' %s  %s%s󰀄 %s%s  %s· updated %s ago · opened %s ago%s\n' "$(badge "$bc" " $st ")" "" "$dim" "$gold" "$who" "$dim" "$upd" "$opened" "$r"
+  printf ' %s %s%s %s→%s %s%s%s\n' "$dim" "$blue" "$(fit "$head" $(( W / 2 )) | sed 's/ *$//')" "$dim" "$r" "$blue" "$base" "$([ "$fork" = true ] && echo "$dim  (fork)")$r"
+  echo
+
+  # status block
+  rule status
+  local ms rd; IFS=$'\x1f' read -r ms rd < <(jq -r '[.mergeStateStatus, (.reviewDecision // "")] | map(tostring) | join("\u001f")' "$j")
+  local row='  %s%s  %-8s%s %s%s\n'
+  if [ "$(jq -r .state "$j")" = OPEN ]; then
+    local m
+    case $ms in
+      CLEAN) m="${green}✓ ready to merge" ;;
+      UNSTABLE) m="${gold}● mergeable, some checks fail" ;;
+      BLOCKED) m="${gold}● blocked$([ "$rd" = REVIEW_REQUIRED ] && echo ": needs an approving review")$([ "$rd" = CHANGES_REQUESTED ] && echo ": changes requested")" ;;
+      BEHIND) m="${gold}● behind the base branch" ;;
+      DIRTY) m="${red}✗ merge conflicts" ;;
+      DRAFT) m="${dim}draft · d marks it ready" ;;
+      HAS_HOOKS) m="${green}✓ mergeable" ;;
+      *) m="${dim}… GitHub is still checking" ;;
+    esac
+    printf "$row" "$dim" "󰘬" merge "$r" "$m" "$r"
+  fi
+  local pass fail pend c
+  read -r pass fail pend < <(jq -r '(.statusCheckRollup // []) | map(.conclusion // .state // .status // "") |
+      [(map(select(test("SUCCESS|NEUTRAL|SKIPPED"))) | length),
+       (map(select(test("FAILURE|ERROR|TIMED_OUT|CANCELLED|ACTION_REQUIRED|STARTUP_FAILURE"))) | length),
+       (map(select(test("SUCCESS|NEUTRAL|SKIPPED|FAILURE|ERROR|TIMED_OUT|CANCELLED|ACTION_REQUIRED|STARTUP_FAILURE") | not)) | length)] | @tsv' "$j")
+  if [ $((pass + fail + pend)) -eq 0 ]; then c="${dim}no checks"
+  else c="${green}✓ $pass passed$r"; [ "$fail" -gt 0 ] && c+="  ${red}✗ $fail failed$r"; [ "$pend" -gt 0 ] && c+="  ${gold}● $pend running$r"; fi
+  printf "$row" "$dim" "󰄴" checks "$r" "$c" "$r"
+  local rv
+  rv=$(jq -r '[(.latestReviews // [])[] | select(.state != "COMMENTED" and .state != "PENDING") |
+        (if .state == "APPROVED" then "\u001b[38;2;158;209;166m✔ \(.author.login)"
+         elif .state == "CHANGES_REQUESTED" then "\u001b[38;2;232;125;125m✎ \(.author.login)"
+         else "\(.author.login) \(.state | ascii_downcase)" end)]
+       + [(.reviewRequests // [])[] | "\u001b[38;2;108;112;134m○ \(.login // .name // .slug)"] | join("\u001b[0m   ")' "$j")
+  printf "$row" "$dim" "󰈈" reviews "$r" "${rv:-${dim}none yet}" "$r"
+  local ad dl cf; read -r ad dl cf < <(jq -r '"\(.additions) \(.deletions) \(.changedFiles)"' "$j")
+  printf "$row" "$dim" "" changes "$r" "$green+$ad $red−$dl$r ${dim}in$r $cf file$([ "$cf" = 1 ] || echo s)  $(bar "$ad" "$dl" 10)" "$r"
+  local lb as
+  lb=$(jq -r '[.labels[].name] | join(", ")' "$j"); as=$(jq -r '[.assignees[].login] | join(", ")' "$j")
+  [ -n "$lb" ] && printf "$row" "$dim" "󰌕" labels "$r" "$lb" "$r"
+  [ -n "$as" ] && printf "$row" "$dim" "󰀄" assigned "$r" "$as" "$r"
+  echo
+
+  # files: bar, +/-, path shortened in the middle to fit
+  rule "files ($cf)"
+  local pw=$(( W - 22 ))
+  jq -r '.files[] | "\(.additions)\t\(.deletions)\t\(.path)"' "$j" | head -30 |
+    while IFS=$'\t' read -r a d p; do
+      ((${#p} > pw)) && p="${p:0:$(( pw / 3 ))}…${p: -$(( pw - pw / 3 - 1 ))}"
+      local dir=${p%/*}/; [ "$dir" = "$p/" ] && dir=""
+      printf '  %s %s%5s%s %s%5s%s  %s%s%s%s%s\n' "$(bar "$a" "$d" 5)" "$green" "+$a" "$r" "$red" "−$d" "$r" "$dim" "$dir" "$fg" "${p##*/}" "$r"
+    done
+  [ "$(jq '.files | length' "$j")" -gt 30 ] && echo "  ${dim}… more in the diff (2)$r"
+  echo
+
+  # description
+  rule description
+  local body; body=$(jq -r '.body // ""' "$j" | tr -d '\r')
+  if [ -n "${body//[[:space:]]/}" ]; then printf '%s\n' "$body" | md | sed 's/^/ /'; else echo "  ${dim}no description$r"; fi
+  echo
+
+  # activity
+  local nc ni; nc=$(jq '(.comments | length) + ([.reviews[] | select(.body != "")] | length)' "$j")
+  ni=$(jq 'length' "$CACHE/$n.rc.json" 2>/dev/null || echo 0)
+  rule activity
+  printf "$row" "$dim" "󰆈" comments "$r" "$nc in the conversation, $ni on the code  ${dim}(4 reads them)" "$r"
+}
+
+view_diff() {
+  [ -s "$CACHE/$1.diff" ] || fetch_pr "$1"
+  [ -s "$CACHE/$1.diff" ] || { echo "${dim}No diff (or couldn't load it).$r"; return; }
+  bat -l diff --color=always --style=plain --paging=never --wrap=character --terminal-width "$(( $(cols) - 1 ))" "$CACHE/$1.diff" 2>/dev/null || cat "$CACHE/$1.diff"
+}
+
+view_checks() {
+  need_pr "$1" || return
+  local rows
+  rows=$(jq -r '(.statusCheckRollup // [])[] |
+      (.conclusion // .state // .status // "") as $s |
+      [(if ($s | test("FAILURE|ERROR|TIMED_OUT|CANCELLED|ACTION_REQUIRED|STARTUP_FAILURE")) then 0
+        elif ($s | test("SUCCESS|NEUTRAL|SKIPPED")) then 2 else 1 end),
+       $s, (.workflowName // ""),
+       (if (.name // "") != "" then .name else (.context // .workflowName // "check") end),
+       (if .startedAt and .completedAt and (.completedAt | startswith("0001") | not) and (.startedAt | startswith("0001") | not)
+        then (((.completedAt | fromdateiso8601) - (.startedAt | fromdateiso8601)) |
+              if . < 0 then "" elif . < 60 then "\(.)s" else "\(. / 60 | floor)m \(. % 60)s" end) else "" end)] | map(tostring) | join("\u001f")' "$CACHE/$1.json" | sort -t$'\x1f' -k1,1n -k3)
+  [ -n "$rows" ] || { echo "  ${dim}No checks on this PR.$r"; return; }
+  while IFS=$'\x1f' read -r _ s wf name dur; do
+    case $s in
+      SUCCESS) i="${green}✓" ;; NEUTRAL|SKIPPED) i="${dim}–" ;;
+      FAILURE|ERROR|TIMED_OUT|CANCELLED|ACTION_REQUIRED|STARTUP_FAILURE) i="${red}✗" ;;
+      *) i="${gold}●" ;;
+    esac
+    printf '  %s%s  %s%s%s  %s%s%s%s\n' "$i" "$r" "$fg" "$name" "$r" "$dim" "$wf" "${dur:+${wf:+ · }$dur}" "$r"
+  done <<<"$rows"
+  grep -q '^0' <<<"$rows" && printf '\n  %sEnter shows the failed jobs'"'"' logs.%s\n' "$dim" "$r"
+}
+
+view_comments() {
+  need_pr "$1" || return
+  local j=$CACHE/$1.json
+  # Conversation: comments and reviews with a body, oldest first
+  local conv
+  conv=$(jq -r '[(.comments[] | {t: .createdAt, who: .author.login, what: "commented", body}),
+                 (.reviews[] | select(.body != "") | {t: .submittedAt, who: .author.login,
+                   what: (.state | ascii_downcase | gsub("_"; " ")), body})] | sort_by(.t)[] |
+                "\u0001\(.who)\t\(.what)\t\(.t)\n\(.body)"' "$j")
+  rule conversation
+  if [ -z "$conv" ]; then echo "  ${dim}No comments.$r"; else
+    printf '%s\n' "$conv" | tr -d '\r' | while IFS= read -r line; do
+      if [[ $line == $'\001'* ]]; then
+        IFS=$'\t' read -r who what t <<<"${line#$'\001'}"
+        printf '\n%s%s%s %s%s · %s%s\n' "$gold$b" "$who" "$r" "$dim" "$what" "${t%T*}" "$r"
+      else fold -s -w $(( $(cols) - 4 )) <<<"$line" | sed 's/^/  /'; fi
+    done
+  fi
+  echo
+  rule "on the code"
+  local rc=$CACHE/$1.rc.json
+  if [ ! -s "$rc" ] || [ "$(jq length "$rc")" = 0 ]; then echo "  ${dim}No review comments on the code.$r"; return; fi
+  jq -r 'sort_by(.path, (.original_line // .line // 0), .created_at)[] |
+      "\u0001\(.path)\t\(.line // .original_line // "?")\t\(.user.login)\t\(if .in_reply_to_id then "reply" else "" end)\n\(.body)"' "$rc" |
+    tr -d '\r' | while IFS= read -r line; do
+      if [[ $line == $'\001'* ]]; then
+        IFS=$'\t' read -r path ln who reply <<<"${line#$'\001'}"
+        printf '\n%s%s:%s%s  %s%s%s%s\n' "$blue" "$path" "$ln" "$r" "$gold" "$who" "$r" "${reply:+ $dim(reply)$r}"
+      else fold -s -w $(( $(cols) - 4 )) <<<"$line" | sed 's/^/  /'; fi
+    done
+}
+
+preview() {
+  [ -n "$1" ] || { echo; echo "  ${dim}No $(state) pull requests in this section. f changes the state, h/l the section, R reloads.$r"; return; }
+  "view_$(mode)" "$1"
+}
+
+preview_label() {
+  local m out="" i=1; m=$(mode)
+  for v in overview diff checks comments; do
+    if [ "$v" = "$m" ]; then out+=" ${key}$i $v$r "; else out+=" ${dim}$i $v$r "; fi
+    i=$((i + 1))
+  done
+  # " repo · 1 overview …": the repo only (the number is in the list and
+  # the overview), with a space of margin from the border.
+  local id=${1%%[[:space:]]*} repo
+  repo=${id%#*}; repo=${repo##*/}
+  printf ' %s' "${repo:+$gold$repo$r $dim·$r}$out"
+}
+
+# The strip (L2): a box across the popup with the section tabs (the current
+# one a gold capsule, like the active window in the tmux bar), and on the
+# right the account and any search. Names shrink to their first word if the
+# tabs don't fit.
+tabs() {
+  local width=$1 i cur f c out="" plain=0 short=0 name; cur=$(sec)
+  for pass in 1 2; do
+    out="" plain=0
+    for ((i = 0; i < $(nsec); i++)); do
+      # Counts take a fixed 2 cells, so tabs don't shift as they load.
+      f=$(listfile "$i"); c=$(jq length "$f" 2>/dev/null || echo "·"); ((${#c} < 2)) && c=" $c"
+      name=$(secf "$i" 1); ((short)) && name=${name%% *}
+      if [ "$i" = "$cur" ]; then
+        out+=$'\e[38;2;212;178;92m\e[0m\e[48;2;212;178;92m\e[38;2;11;14;20m\e[1m'"$name $c"$'\e[0m\e[38;2;212;178;92m\e[0m  '
+      else out+=" ${sub}$name ${dim}$c$r   "; fi
+      plain=$(( plain + ${#name} + ${#c} + 5 ))
+    done
+    ((plain <= width)) && break
+    short=1
+  done
+  printf '%s' "$out"
+}
+
+strip_line() {
+  local W=$1 right rplain q a t plain gap
+  a=$(acct); q=$(query)
+  right="${dim}󰀄 ${sub}${a:-all accounts}$r   ${dim}? keys$r"; rplain="󰀄 ${a:-all accounts}   ? keys"
+  [ -n "$q" ] && { right="${dim}󰍉 ${gold}$q$r   $right"; rplain="󰍉 $q   $rplain"; }
+  t=$(tabs $(( W - ${#rplain} - 8 )))
+  plain=$(sed 's/\x1b\[[0-9;]*m//g' <<<"$t"); plain=${#plain}
+  gap=$(( W - 4 - plain - ${#rplain} )); ((gap < 1)) && gap=1
+  printf '%s│%s %s%*s%s %s│%s' "$line" "$r" "$t" "$gap" '' "$right" "$line" "$r"
+}
+
+# --strip: redraw the box when the section, state, account, search or a
+# count changes (checked 4 times a second, only while the popup is open).
+# The frame is built first and written in one go over the old one, and
+# not at all if it's unchanged: clearing and redrawing made it flicker.
+strip() {
+  local line=$'\e[38;2;59;64;72m' sig old="" W frame shown="" bar
+  printf '\e[?25l'
+  while [ -d "$STATE" ]; do
+    W=$(tput cols)
+    sig="$W $(cat "$STATE"/{sec,state,acct,query} 2>/dev/null | tr '\n' ' ') $(stat -c %Y "$CROOT"/sections/*.json "$STATE"/q-*.json "$STATE/sections" 2>/dev/null | md5sum)"
+    if [ "$sig" != "$old" ]; then
+      old=$sig
+      bar=$(printf '─%.0s' $(seq 1 $((W - 2))))
+      frame="$line╭$bar╮$r"$'\e[K\n'"$(strip_line "$W")"$'\e[K\n'"$line╰$bar╯$r"$'\e[K'
+      [ "$frame" != "$shown" ] && { printf '\e[H%s' "$frame"; shown=$frame; }
+    fi
+    read -rt 0.25 <> <(:) 2>/dev/null || true
+  done
+}
+
+list_label() {
+  printf ' 󰊤 %s %s· %s · %s %s' "$(secf "$(sec)" 1)" "$dim" "$(state)" "${1:-${FZF_TOTAL_COUNT:-0}}" "$r"
+}
+
+# --------------------------------------------------- sections from the UI
+# S edits the sections file for you: the config's comment header is kept,
+# the section lines are rewritten aligned.
+read_config() {
+  NAMES=() ACCTS=() QUERIES=() HEADER=""
+  [ -f "$CONFIG" ] || default_config
+  local line a b c
+  while IFS= read -r line; do
+    if [ ${#NAMES[@]} -eq 0 ] && [[ $line == \#* || -z ${line// /} ]]; then HEADER+="$line"$'\n'; continue; fi
+    line=${line%%#*}; [[ $line == *'|'*'|'* ]] || continue
+    IFS='|' read -r a b c <<<"$line"
+    a=$(sed 's/^ *//; s/ *$//' <<<"$a") b=$(sed 's/^ *//; s/ *$//' <<<"$b") c=$(sed 's/^ *//; s/ *$//' <<<"$c")
+    NAMES+=("$a") ACCTS+=("$b") QUERIES+=("$c")
+  done <"$CONFIG"
+}
+
+write_config() {
+  local i wn=4 wa=7
+  for i in "${!NAMES[@]}"; do ((${#NAMES[i]} > wn)) && wn=${#NAMES[i]}; ((${#ACCTS[i]} > wa)) && wa=${#ACCTS[i]}; done
+  { printf '%s' "$HEADER"
+    for i in "${!NAMES[@]}"; do printf '%-*s | %-*s | %s\n' "$wn" "${NAMES[i]}" "$wa" "${ACCTS[i]}" "${QUERIES[i]}"; done
+  } >"$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
+}
+
+# Index in the config of the section shown now (by name and search).
+config_index() {
+  local n q i; n=$(secf "$(sec)" 1) q=$(secf "$(sec)" 3)
+  for i in "${!NAMES[@]}"; do [ "${NAMES[i]}" = "$n" ] && [ "${QUERIES[i]}" = "$q" ] && { echo "$i"; return; }; done
+  return 1
+}
+
+pick() {  # pick <label> <options...>: a small fzf menu, prints the choice
+  local label=$1; shift
+  printf '%s\n' "$@" | fzf --ansi --layout reverse --no-info --no-separator --no-scrollbar --margin 18%,22% \
+    --border rounded --border-label " $label " --border-label-pos 3 --pointer '▌' --prompt '  ' --gutter ' ' \
+    --color "bg:-1,bg+:#2A2D35,fg:#D7DDE6,fg+:#FFFFFF,hl:#D095A4,hl+:#D095A4,border:#D095A4,label:#D095A4,prompt:#D095A4,pointer:#D095A4"
+}
+
+ask_line() {  # ask_line <prompt> <hint> <prefill>
+  printf '\n  %s%s%s\n  %s%s%s\n\n  %s❯%s ' "$fg$b" "$1" "$r" "$dim" "$2" "$r" "$rose" "$r" >&2
+  local v; read -re -i "$3" v || return 1; printf '%s' "$v"
+}
+
+# Name, account and search for a new or edited section.
+section_form() {  # section_form <name> <account> <search>
+  local n a q choice
+  clear; n=$(ask_line "Section name" "shown on its tab" "$1") || return 1
+  [ -n "${n// /}" ] || return 1
+  local -a opts=("any account (gh's active one)"); mapfile -t -O 1 opts <"$STATE/accounts"
+  choice=$(pick "account for $n" "${opts[@]}") || return 1
+  [[ $choice == any* ]] && a="" || a=$choice
+  clear; q=$(ask_line "GitHub search for $n" "e.g. review-requested:@me · author:@me · repo:owner/name · org:name · label:bug  (is:pr and the state are added)" "$3") || return 1
+  [ -n "${q// /}" ] || return 1
+  FORM=("$n" "$a" "$q")
+}
+
+after_sections_change() {  # show the section named $1
+  build_sections
+  local i; i=$(awk -F'\t' -v n="$1" '$1 == n { print NR - 1; exit }' "$STATE/sections")
+  echo "${i:-0}" >"$STATE/sec"; secf "${i:-0}" 1 >"$CROOT/last-section"
+  rm -f "$STATE/fresh" "$STATE/query"; setsid -f "$self" --fetch-all >/dev/null 2>&1
+}
+
+sections_menu() {
+  read_config
+  local cur ci here=""; cur=$(secf "$(sec)" 1); ci=$(config_index) || ci=""
+  [ -z "$ci" ] && [ -n "$HERE" ] && [ "$(secf "$(sec)" 3)" = "repo:$HERE" ] && here=1
+  local -a items=("add      new section")
+  [ -n "$ci" ] && items+=("edit     $cur: name, account, search" "delete   $cur" "left     move $cur left" "right    move $cur right")
+  [ -n "$here" ] && items+=("pin      keep $HERE as a section")
+  local choice; choice=$(pick "sections" "${items[@]}") || return
+  case ${choice%% *} in
+    add) section_form "" "" "" || return; NAMES+=("${FORM[0]}") ACCTS+=("${FORM[1]}") QUERIES+=("${FORM[2]}"); write_config; after_sections_change "${FORM[0]}" ;;
+    edit) section_form "${NAMES[ci]}" "${ACCTS[ci]}" "${QUERIES[ci]}" || return
+      NAMES[ci]=${FORM[0]} ACCTS[ci]=${FORM[1]} QUERIES[ci]=${FORM[2]}; write_config; after_sections_change "${FORM[0]}" ;;
+    delete)
+      [ "$(pick "delete $cur?" "no, keep it" "yes, delete $cur")" = "yes, delete $cur" ] || return
+      unset 'NAMES[ci]' 'ACCTS[ci]' 'QUERIES[ci]'; NAMES=("${NAMES[@]}") ACCTS=("${ACCTS[@]}") QUERIES=("${QUERIES[@]}")
+      write_config; after_sections_change "${NAMES[0]:-}" ;;
+    left | right)
+      local o; [ "${choice%% *}" = left ] && o=$((ci - 1)) || o=$((ci + 1))
+      ((o >= 0 && o < ${#NAMES[@]})) || return
+      local t
+      t=${NAMES[ci]} NAMES[ci]=${NAMES[o]} NAMES[o]=$t
+      t=${ACCTS[ci]} ACCTS[ci]=${ACCTS[o]} ACCTS[o]=$t
+      t=${QUERIES[ci]} QUERIES[ci]=${QUERIES[o]} QUERIES[o]=$t
+      write_config; after_sections_change "$cur" ;;
+    pin) NAMES+=("${HERE#*/}") ACCTS+=("$HERE_USER") QUERIES+=("repo:$HERE"); write_config; after_sections_change "${HERE#*/}" ;;
+  esac
+}
+
+# ? : a popup of the gh-prs session (tmux draws its border and title)
+# with every key, grouped; any key closes it.
+keysheet() {
+  local -a L=("${dim}MOVE${r}"
+    "  ${key}j / k${r}    next / previous PR" "  ${key}g / G${r}    first / last" "  ${key}h / l${r}    previous / next section"
+    "  ${key}/${r}        filter the list" "  ${key}s${r}        search GitHub" "  ${key}f${r}        open/merged/closed/all"
+    "  ${key}F${r}        open ↔ all" "  ${key}u${r}        switch account" "  ${key}R${r}        reload" "  ${key}S${r}        add/edit/move sections" "  ${key}E${r}        sections file")
+  local -a M=("${dim}READ${r}"
+    "  ${key}1${r} overview   ${key}2${r} diff" "  ${key}3${r} checks     ${key}4${r} comments" "  ${key}Tab${r}      next view"
+    "  ${key}J / K${r}    scroll preview" "  ${key}^d / ^u${r}  half a page" "  ${key}Enter${r}    full screen" "  ${key}b${r}        open in browser" "  ${key}y${r}        copy link")
+  local -a A=("${dim}ACT${r}"
+    "  ${key}m${r}  merge" "  ${key}a${r}  approve" "  ${key}r${r}  request changes" "  ${key}c${r}  comment" "  ${key}x${r}  close / reopen"
+    "  ${key}o${r}  checkout (in its clone)" "  ${key}d${r}  draft / ready" "  ${key}q${r}  quit (or prefix $(k=$(tmux show -gqv @gh-pr-key); echo "${k:-G}"))")
+  local cw=36 i n=${#L[@]} top
+  ((${#M[@]} > n)) && n=${#M[@]}; ((${#A[@]} > n)) && n=${#A[@]}
+  plainlen() { local x; x=$(sed 's/\x1b\[[0-9;]*m//g' <<<"$1"); echo ${#x}; }
+  cell() { printf '%s%*s' "$1" $(( cw - $(plainlen "$1") )) ''; }
+  top=$(( ($(tput lines) - n) / 2 )); ((top < 0)) && top=0
+  printf '\e[?25l\e[2J'
+  for ((i = 0; i < n; i++)); do
+    printf '\e[%d;3H%s%s%s' $(( top + i + 1 )) "$(cell "${L[i]:-}")" "$(cell "${M[i]:-}")" "${A[i]:-}"
+  done
+  read -rsn1
+}
+
+# Full-screen version of the current view; in checks, the failed jobs' logs.
+open_full() {
+  local n=$1; [ -n "$n" ] || return
+  export FZF_PREVIEW_COLUMNS=$(tput cols)
+  # Nerd Font icons are private-use code points; tell less they print.
+  export LESSUTFCHARDEF=e000-f8ff:p,f0000-ffffd:p
+  if [ "$(mode)" = checks ]; then
+    local jobs
+    jobs=$(jq -r '(.statusCheckRollup // [])[] | select((.conclusion // "") | test("FAILURE|TIMED_OUT|CANCELLED|STARTUP_FAILURE")) | .detailsUrl // empty' "$CACHE/$n.json" |
+      sed -n 's#.*/actions/runs/[0-9]*/job/\([0-9]*\).*#\1#p')
+    if [ -n "$jobs" ]; then
+      for id in $jobs; do gh run view -R "$REPO" --job "$id" --log-failed 2>&1 | fmt_log; done | less -R
+      return
+    fi
+  fi
+  preview "$n" | less -R
+}
+
+# gh's "job <TAB> step <TAB> timestamp text" lines: one header per job/step,
+# no timestamps or leftover color codes, errors in red.
+fmt_log() {
+  awk -F'\t' -v red="$red" -v gold="$gold$b" -v dim="$dim" -v r="$r" '
+    NF < 3 { print; next }
+    $1 != job { job = $1; print "\n" gold "✗ " job r }
+    $2 != step { step = $2; print dim "  ── " step " ──" r }
+    { line = $3; for (i = 4; i <= NF; i++) line = line "\t" $i
+      sub(/^\xef\xbb\xbf/, "", line); sub(/^[0-9-]+T[0-9:.]+Z ?/, "", line)
+      gsub(/(\^\[|\033)\[[0-9;]*m/, "", line)
+      if (line ~ /^##\[endgroup\]/) next
+      sub(/^##\[group\]/, "▸ ", line)
+      if (line ~ /##\[error\]|FAIL|[Ee]rror:/) { sub(/##\[error\]/, "", line); line = red line r }
+      print "    " line }'
+}
+
+# ------------------------------------------------------------------ actions
+pause() { printf '\n%spress any key%s' "$dim" "$r"; read -rsn1; }
+ask() { local k; printf '%s' "$1" >&2; read -rsn1 k; echo >&2; printf '%s' "$k"; }
+# A desktop notification (notify-send), else a tmux message.
+notify() {
+  if command -v notify-send >/dev/null; then notify-send -a tmux -i utilities-terminal "PR #$1" "$2"
+  else tmux display-message "PR #$1: $2"; fi
+}
+# stdin to the clipboard: the first that works of Wayland, X11 and macOS,
+# else tmux's buffer (and, with set-clipboard on, the terminal's via OSC 52).
+clip() {
+  local s; s=$(cat)
+  { command -v wl-copy >/dev/null && printf '%s' "$s" | wl-copy 2>/dev/null; } ||
+    { command -v xclip >/dev/null && printf '%s' "$s" | xclip -selection clipboard 2>/dev/null; } ||
+    { command -v pbcopy >/dev/null && printf '%s' "$s" | pbcopy; } ||
+    printf '%s' "$s" | tmux load-buffer -w -
+}
+
+header() {
+  clear
+  jq -r '"\u001b[1;38;2;212;178;92m#\(.number)\u001b[0m  \u001b[1m\(.title)\u001b[0m\n\u001b[38;2;108;112;134m\(.author.login) · \(.headRefName) → \(.baseRefName) · \(.state | ascii_downcase)\u001b[0m\n"' "$CACHE/$1.json"
+}
+
+# Message in $EDITOR. Prints the file's text above the marker; empty = cancel.
+compose() {
+  local f; f=$(mktemp --suffix=.md)
+  printf '\n\n──── write above this line; leave it empty to cancel ────\n%s on #%s: %s\n' "$1" "$2" "$(jq -r .title "$CACHE/$2.json")" >"$f"
+  "${VISUAL:-${EDITOR:-nvim}}" "$f" </dev/tty >/dev/tty
+  sed '/^──── write above this line/,$d' "$f"
+  rm -f "$f"
+}
+
+# ------------------------------------------------------------------ merge
+# m: a merge panel. Readiness (checks, reviews, conflicts, up to date,
+# draft), the commits that land, and only what fits the PR's state: the
+# repo's allowed merge methods when it's ready, update branch when it's
+# behind, auto-merge or an admin merge when it's blocked, local checkout
+# when it conflicts, ready-for-review when it's a draft. It re-reads the
+# PR after each step, so update → auto-merge works in one sitting.
+#
+# keybind: Tmux/PR merge panel | s / m / r | Merge the PR: squash, merge commit or rebase (only the repo's allowed ones)
+# keybind: Tmux/PR merge panel | u | Update the branch with its base (when it's behind)
+# keybind: Tmux/PR merge panel | a | Set auto-merge on (merges once checks and reviews pass)
+# keybind: Tmux/PR merge panel | ! | Merge anyway as admin (bypass the branch rules)
+# keybind: Tmux/PR merge panel | d | Set the draft ready for review
+# keybind: Tmux/PR merge panel | o | Switch this repo to the PR's branch to resolve conflicts
+# keybind: Tmux/PR merge panel | q / Esc | Close the merge panel
+spin() {  # spin <message> <command...>: run it with a spinner, keep its output in $OUT
+  local f; f=$(mktemp); "${@:2}" >"$f" 2>&1 & local pid=$! i=0 c='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+  while kill -0 "$pid" 2>/dev/null; do printf '\r  %s%s%s %s' "$gold" "${c:i++%10:1}" "$r" "$1"; read -rt 0.1 <> <(:) 2>/dev/null || true; done
+  wait "$pid"; local rc=$?; OUT=$(cat "$f"); rm -f "$f"; printf '\r\e[K'; return $rc
+}
+
+merge_panel() {
+  local n=$1 k
+  while :; do
+    clear; printf '\n  %sloading #%s…%s' "$dim" "$n" "$r"
+    # Fresh state (background) while the repo's merge settings are read.
+    fetch_pr "$n" --quick &
+    wait
+    local meta commits
+    meta=$(gh api "repos/$REPO" --jq '[.allow_squash_merge, .allow_merge_commit, .allow_rebase_merge, .allow_auto_merge, .delete_branch_on_merge, (.permissions.admin // false)] | map(tostring) | join(" ")' 2>/dev/null)
+    local j=$CACHE/$n.json
+    local title st draft ms mg rd head base cross add del
+    IFS=$'\x1f' read -r title st draft ms mg rd head base cross add del < <(jq -r '[.title, .state, .isDraft, .mergeStateStatus, .mergeable,
+      (.reviewDecision // ""), .headRefName, .baseRefName, .isCrossRepository, .additions, .deletions] | map(tostring) | join("\u001f")' "$j")
+    local sq mc rb am autodel admin; read -r sq mc rb am autodel admin <<<"$meta"
+    local behind; behind=$(gh api "repos/$REPO/compare/$base...$(jq -r '.headRefName' "$j")" --jq .behind_by 2>/dev/null || echo "?")
+    commits=$(gh pr view "$n" -R "$REPO" --json commits --jq '.commits[] | "\(.oid[0:7])\t\(.messageHeadline)"' 2>/dev/null)
+    local nc; nc=$(grep -c . <<<"$commits")
+
+    clear; echo
+    printf '  %sMerge%s  %s#%s%s  %s%s%s\n' "$rose$b" "$r" "$gold$b" "$n" "$r" "$fg$b" "$title" "$r"
+    printf '  %s%s%s %s→%s %s%s%s %s· %s commit%s · %s+%s %s−%s%s\n\n' "$blue" "$head" "$r" "$dim" "$r" "$blue" "$base" "$r" "$dim" "$nc" "$([ "$nc" = 1 ] || echo s)" "$green" "$add" "$red" "$del" "$r"
+    [ "$st" = OPEN ] || { printf '  This PR is %s; nothing to merge.\n' "${st,,}"; pause; return; }
+
+    # readiness
+    rule readiness
+    local pass fail pend; read -r pass fail pend < <(jq -r '(.statusCheckRollup // []) | map(.conclusion // .state // .status // "") |
+      [(map(select(test("SUCCESS|NEUTRAL|SKIPPED"))) | length), (map(select(test("FAILURE|ERROR|TIMED_OUT|CANCELLED|ACTION_REQUIRED|STARTUP_FAILURE"))) | length),
+       (map(select(test("SUCCESS|NEUTRAL|SKIPPED|FAILURE|ERROR|TIMED_OUT|CANCELLED|ACTION_REQUIRED|STARTUP_FAILURE") | not)) | length)] | @tsv' "$j")
+    local ok="${green}✓$r" no="${red}✗$r" wait="${gold}●$r" line='  %s  %-11s %s\n'
+    if [ $((pass + fail + pend)) -eq 0 ]; then printf "$line" "$ok" checks "${dim}none on this repo$r"
+    elif [ "$fail" -gt 0 ]; then printf "$line" "$no" checks "${red}$fail failed$r$([ "$pass" -gt 0 ] && echo ", $pass passed")"
+    elif [ "$pend" -gt 0 ]; then printf "$line" "$wait" checks "${gold}$pend running$r, $pass passed"
+    else printf "$line" "$ok" checks "$pass passed"; fi
+    case $rd in
+      APPROVED) printf "$line" "$ok" review "approved" ;;
+      CHANGES_REQUESTED) printf "$line" "$no" review "${red}changes requested$r" ;;
+      REVIEW_REQUIRED) printf "$line" "$wait" review "${gold}needs an approving review$r" ;;
+      *) printf "$line" "$ok" review "${dim}not required$r" ;;
+    esac
+    case $mg in
+      CONFLICTING) printf "$line" "$no" conflicts "${red}conflicts with $base$r" ;;
+      MERGEABLE) printf "$line" "$ok" conflicts "none" ;;
+      *) printf "$line" "$wait" conflicts "${dim}GitHub is still checking$r" ;;
+    esac
+    if [ "$behind" = 0 ]; then printf "$line" "$ok" "up to date" "with $base"
+    else printf "$line" "$([ "$ms" = BEHIND ] && echo "$no" || echo "$wait")" "up to date" "behind $base by $behind commit$([ "$behind" = 1 ] || echo s)$([ "$ms" = BEHIND ] && echo "${dim} · required here$r")"; fi
+    [ "$draft" = true ] && printf "$line" "$no" draft "${red}still a draft$r"
+    echo
+
+    # commits that land
+    rule "commits ($nc)"
+    head -6 <<<"$commits" | while IFS=$'\t' read -r sha msg; do printf '  %s%s%s  %s\n' "$dim" "$sha" "$r" "$msg"; done
+    ((nc > 6)) && printf '  %s… %s more%s\n' "$dim" $((nc - 6)) "$r"
+    echo
+
+    # what can be done now
+    rule "what now"
+    local -a keys=()
+    opt() { keys+=("$1"); printf '  %s%s%s  %-22s %s%s%s\n' "$key" "$1" "$r" "$2" "$dim" "$3" "$r"; }
+    local ready=""; case $ms in CLEAN | HAS_HOOKS | UNSTABLE) ready=1 ;; esac
+    [ "$draft" = true ] && ready=""
+    if [ -n "$ready" ]; then
+      [ "$sq" = true ] && opt s "squash and merge" "one commit on $base: \"$title (#$n)\""
+      [ "$mc" = true ] && opt m "create a merge commit" "keeps the $nc commit$([ "$nc" = 1 ] || echo s), plus a merge commit"
+      [ "$rb" = true ] && opt r "rebase and merge" "replays the commit$([ "$nc" = 1 ] || echo s) on $base, no merge commit"
+      [ "$ms" = UNSTABLE ] && printf '  %s(some checks fail, but none are required here)%s\n' "$dim" "$r"
+    fi
+    [ "$draft" = true ] && opt d "mark ready for review" "drafts can't be merged"
+    [ "$ms" = BEHIND ] && opt u "update branch" "merges $base into $head, then checks run again"
+    [ "$mg" = CONFLICTING ] && { if [ "$HERE" = "$REPO" ]; then opt o "check out to resolve" "switch this repo to $head"
+      else printf '  %sresolve in a clone: gh pr checkout %s -R %s%s\n' "$dim" "$n" "$REPO" "$r"; fi; }
+    [ -z "$ready" ] && [ "$draft" != true ] && [ "$mg" != CONFLICTING ] && [ "$am" = true ] && opt a "enable auto-merge" "squash-merges by itself once checks and reviews pass"
+    [ -z "$ready" ] && [ "$admin" = true ] && [ "$mg" != CONFLICTING ] && [ "$draft" != true ] && opt '!' "merge anyway (admin)" "bypasses the branch rules"
+    printf '\n  %sq%s close\n\n  ' "$key" "$r"
+
+    k=$(ask "")
+    case $k in
+      s | m | r)
+        [[ " ${keys[*]} " == *" $k "* ]] || continue
+        local how; case $k in s) how=--squash ;; m) how=--merge ;; r) how=--rebase ;; esac
+        merge_now "$n" "$how" "" "$title" "$head" "$base" "$cross" "$autodel" && return ;;
+      '!') [[ " ${keys[*]} " == *" ! "* ]] || continue
+        local how=--squash; [ "$sq" = true ] || { [ "$mc" = true ] && how=--merge || how=--rebase; }
+        merge_now "$n" "$how" --admin "$title" "$head" "$base" "$cross" "$autodel" && return ;;
+      a) [[ " ${keys[*]} " == *" a "* ]] || continue
+        if spin "enabling auto-merge…" gh pr merge "$n" -R "$REPO" --squash --auto; then notify "$n" "Auto-merge enabled: $title"; printf '  %s✓ auto-merge on: it merges once everything passes%s\n' "$green" "$r"; sleep 1.2; return
+        else printf '  %s%s%s\n' "$red" "$OUT" "$r"; pause; fi ;;
+      u) [[ " ${keys[*]} " == *" u "* ]] || continue
+        if spin "updating $head with $base…" gh api -X PUT "repos/$REPO/pulls/$n/update-branch"; then printf '  %s✓ updated; checks are running again%s\n' "$green" "$r"; sleep 1.2
+        else printf '  %s%s%s\n' "$red" "$OUT" "$r"; pause; fi ;;
+      d) [[ " ${keys[*]} " == *" d "* ]] || continue
+        spin "marking ready…" gh pr ready "$n" -R "$REPO" || { printf '  %s%s%s\n' "$red" "$OUT" "$r"; pause; } ;;
+      o) [[ " ${keys[*]} " == *" o "* ]] || continue
+        spin "checking out $head…" gh pr checkout "$n" -R "$REPO" && { notify "$n" "Checked out $head to resolve conflicts"; return; }
+        printf '  %s%s%s\n' "$red" "$OUT" "$r"; pause ;;
+      *) return ;;
+    esac
+  done
+}
+
+# Commit message (squash), branch deletion, one confirm, then merge.
+merge_now() {  # merge_now n how admin title head base cross autodel
+  local n=$1 how=$2 admin=$3 title=$4 head=$5 base=$6 cross=$7 autodel=$8 subject="" del=n k
+  echo
+  if [ "$how" = --squash ]; then
+    printf '  %sCommit title%s %s(Enter keeps it)%s\n  %s❯%s ' "$fg$b" "$r" "$dim" "$r" "$rose" "$r"
+    read -re -i "$title (#$n)" subject || return 1
+  fi
+  if [ "$cross" = false ] && [ "$autodel" != true ]; then
+    k=$(ask "  Delete ${blue}$head${r} on GitHub afterwards? ${key}Y${r}/n ")
+    [ "$k" = n ] || [ "$k" = N ] || del=y
+  fi
+  local verb; case $how in --squash) verb="Squash-merge" ;; --merge) verb="Merge" ;; *) verb="Rebase-merge" ;; esac
+  k=$(ask "  $verb #$n into ${blue}$base${r}${admin:+ ${red}as admin${r}}$([ "$del" = y ] && echo ", delete $head")? ${key}Enter${r} merges, Esc cancels ")
+  [ -z "$k" ] || return 1
+  # -R and no --delete-branch: gh then leaves the local checkout alone.
+  if spin "merging…" gh pr merge "$n" -R "$REPO" $how $admin ${subject:+--subject "$subject"}; then
+    [ "$del" = y ] && gh api -X DELETE "repos/$REPO/git/refs/heads/$head" >/dev/null 2>&1
+    local sha; sha=$(gh pr view "$n" -R "$REPO" --json mergeCommit --jq '.mergeCommit.oid[0:7]' 2>/dev/null)
+    printf '  %s✓ merged into %s%s%s%s\n' "$green" "$base" "${sha:+ as $sha}" "$([ "$del" = y ] && echo ", $head deleted")" "$r"
+    notify "$n" "Merged into $base: $title"; sleep 1.4; return 0
+  fi
+  printf '  %s%s%s\n' "$red" "$OUT" "$r"; pause; return 1
+}
+
+action() {
+  local a=$1 n=$2
+  [ -n "$n" ] || return
+  need_pr "$n" >/dev/null || { pause; return; }
+  local title state; title=$(jq -r .title "$CACHE/$n.json"); state=$(jq -r .state "$CACHE/$n.json")
+  case $a in
+    merge) merge_panel "$n" ;;
+    approve)
+      header "$n"
+      printf '  Approve with an optional message (Enter approves, Ctrl+c cancels):\n  %s❯%s ' "$rose" "$r"
+      local msg; read -re msg || return
+      if out=$(gh pr review "$n" -R "$REPO" --approve ${msg:+--body "$msg"} 2>&1); then
+        notify "$n" "Approved: $title"
+      else echo "${red}$out${r}"; pause; fi ;;
+    request)
+      local body; body=$(compose "Requesting changes" "$n")
+      [ -n "${body//[[:space:]]/}" ] || return
+      header "$n"
+      if out=$(gh pr review "$n" -R "$REPO" --request-changes --body "$body" 2>&1); then
+        notify "$n" "Requested changes: $title"
+      else echo "${red}$out${r}"; pause; fi ;;
+    comment)
+      local body; body=$(compose "Comment" "$n")
+      [ -n "${body//[[:space:]]/}" ] || return
+      header "$n"
+      if out=$(gh pr comment "$n" -R "$REPO" --body "$body" 2>&1); then
+        notify "$n" "Commented: $title"
+      else echo "${red}$out${r}"; pause; fi ;;
+    close)
+      header "$n"
+      case $state in
+        OPEN)
+          [ "$(ask "  Close this PR without merging? y/${key}N${r} ")" = y ] || return
+          printf '  Optional closing comment (Enter to skip):\n  %s❯%s ' "$rose" "$r"
+          local msg; read -re msg || return
+          if out=$(gh pr close "$n" -R "$REPO" ${msg:+--comment "$msg"} 2>&1); then notify "$n" "Closed: $title"
+          else echo "${red}$out${r}"; pause; fi ;;
+        CLOSED)
+          [ "$(ask "  Reopen this PR? y/${key}N${r} ")" = y ] || return
+          if out=$(gh pr reopen "$n" -R "$REPO" 2>&1); then notify "$n" "Reopened: $title"
+          else echo "${red}$out${r}"; pause; fi ;;
+        *) echo "  Merged PRs can't be closed or reopened."; pause ;;
+      esac ;;
+    checkout)
+      header "$n"
+      [ "$HERE" = "$REPO" ] || { echo "  Checkout works inside a clone of $REPO; this popup was opened in ${HERE:-a folder outside any GitHub repo}."; pause; return; }
+      [ "$(ask "  Switch $(basename "$PWD") to this PR's branch? y/${key}N${r} ")" = y ] || return
+      if out=$(gh pr checkout "$n" -R "$REPO" 2>&1); then echo "${green}$out${r}"; notify "$n" "Checked out: $title"; sleep 0.8
+      else echo "${red}$out${r}"; pause; fi ;;
+    draft)
+      if [ "$(jq -r .isDraft "$CACHE/$n.json")" = true ]; then out=$(gh pr ready "$n" -R "$REPO" 2>&1) && notify "$n" "Ready for review: $title"
+      else out=$(gh pr ready "$n" -R "$REPO" --undo 2>&1) && notify "$n" "Back to draft: $title"; fi ||
+        { header "$n"; echo "${red}$out${r}"; pause; } ;;
+  esac
+  fetch_pr "$n" --quick
+}
+
+# --session (prefix G's popup runs this): sections for this folder, then a
+# tmux session with the strip on top and fzf below, attached in the popup.
+open_session() {
+  local url name sock
+  url=$(git remote get-url origin 2>/dev/null); url=${url%.git}
+  case $url in *github*) HERE=$(sed -E 's#.*[:/]([^/:]+/[^/]+)$#\1#' <<<"$url") ;; esac
+  HERE_USER=$(git config --get github.user 2>/dev/null)
+  STATE=$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/gh-pr.XXXXXX")
+  mkdir -p "$CROOT/sections"
+  export HERE HERE_USER STATE
+  gh auth status 2>&1 | sed -n 's/.*Logged in to github.com account \([^ ]*\).*/\1/p' >"$STATE/accounts"
+  # The account picked with u last time (kept in ~/.cache across reboots),
+  # if it's still signed in.
+  local last; last=$(cat "$CROOT/last-account" 2>/dev/null)
+  [ -n "$last" ] && grep -qixF "$last" "$STATE/accounts" && printf '%s' "$last" >"$STATE/acct"
+  build_sections
+  setsid -f "$self" --fetch-all >/dev/null 2>&1
+  # Same tmux server as the popup's client (works on a -L test server too).
+  sock=${TMUX%%,*} name=gh-prs-$$
+  local env=(-e "STATE=$STATE" -e "HERE=$HERE" -e "HERE_USER=$HERE_USER" -e "PATH=$PATH")
+  tmux -S "$sock" new-session -d -s "$name" -x "$(tput cols)" -y "$(tput lines)" -c "$PWD" "${env[@]}" "$self --main $name"
+  tmux -S "$sock" set -t "$name" status off \; set -t "$name" detach-on-destroy on \; \
+    set -w -t "$name" pane-border-lines spaces \; set -w -t "$name" pane-border-status off \; \
+    split-window -v -b -l 3 -t "$name" "${env[@]}" "$self --strip" \; last-pane -t "$name"
+  exec env -u TMUX tmux -S "$sock" attach -t "$name"
+}
+
+# --main: the list and preview; quitting ends the session (and the popup).
+run_main() {
+  local name=$1
+  trap 'rm -rf "$STATE"; tmux kill-session -t "$name" 2>/dev/null' EXIT
+  normal="hide-input+rebind($NORMAL_KEYS)"
+  # esc/enter use transform:CMD (to the end of the binding), not transform(CMD):
+  # fzf ends the latter at the first ")", which is inside rebind(...).
+  act() { echo "execute($self --action $1 {1})+reload-sync($self --reload)+refresh-preview"; }
+
+  # Cached list first (instant), the fresh one replaces it once fetched.
+  "$self" --list --cached | SHELL=bash fzf --ansi --delimiter '\t' --with-nth 2.. \
+    --no-input --no-hscroll --layout reverse --info hidden --no-separator --no-scrollbar --highlight-line \
+    --prompt '  ' --pointer '▌' --marker ' ' --gutter ' ' \
+    --input-border rounded --input-label ' search (Enter or Esc: back to normal mode) ' --input-label-pos 3 \
+    --list-border rounded --list-label-pos 3 --header-lines 1 --header-lines-border inline \
+    --preview "$self --preview {1}" --preview-window 'right,42%,border-rounded,nowrap' --preview-label-pos 3 \
+    --bind "load:transform($self --on-load)" \
+    --bind "focus:transform-preview-label($self --plabel {1})" \
+    --bind "j:down,k:up,g:first,G:last,J:preview-down,K:preview-up,ctrl-d:preview-half-page-down,ctrl-u:preview-half-page-up" \
+    --bind "1:execute-silent($self --mode overview)+refresh-preview+transform-preview-label($self --plabel {1})" \
+    --bind "2:execute-silent($self --mode diff)+refresh-preview+transform-preview-label($self --plabel {1})" \
+    --bind "3:execute-silent($self --mode checks)+refresh-preview+transform-preview-label($self --plabel {1})" \
+    --bind "4:execute-silent($self --mode comments)+refresh-preview+transform-preview-label($self --plabel {1})" \
+    --bind "tab:execute-silent($self --next-mode)+refresh-preview+transform-preview-label($self --plabel {1})" \
+    --bind "f:execute-silent($self --next-state)+reload-sync($self --list --cached)" \
+    --bind "F:execute-silent($self --toggle-all)+reload-sync($self --list --cached)" \
+    --bind "u:execute-silent($self --next-acct)+reload-sync($self --list --cached)+first" \
+    --bind "s:execute($self --search)+reload-sync($self --list --cached)+first" \
+    --bind "h:execute-silent($self --section -1)+reload-sync($self --list --cached)+first" \
+    --bind "l:execute-silent($self --section 1)+reload-sync($self --list --cached)+first" \
+    --bind "E:execute($self --edit)+reload-sync($self --list --cached)" \
+    --bind "S:execute($self --sections-menu)+reload-sync($self --list --cached)+first" \
+    --bind "R:execute-silent(rm -f \"\$STATE\"/prefetched-*)+reload-sync($self --reload)+refresh-preview" \
+    --bind "m:$(act merge),a:$(act approve),r:$(act request),c:$(act comment),x:$(act close),o:$(act checkout),d:$(act draft)" \
+    --bind "y:execute-silent($self --copy {1})" \
+    --bind "b:execute-silent(setsid -f $self --web {1} >/dev/null 2>&1)" \
+    --bind "q:abort" \
+    --bind "?:execute-silent($self --show-keys)" \
+    --bind "/:show-input+unbind($NORMAL_KEYS)" \
+    --bind "esc:transform:[ \"\$FZF_INPUT_STATE\" = enabled ] && echo '$normal' || echo abort" \
+    --bind "enter:transform:[ \"\$FZF_INPUT_STATE\" = enabled ] && echo '$normal' || echo \"execute($self --full {1})\"" \
+    --color "bg:-1,bg+:#2A2D35,fg:#D7DDE6,fg+:#FFFFFF,hl:#D095A4,hl+:#D095A4" \
+    --color "border:#D095A4,label:#D095A4,prompt:#D095A4,pointer:#D095A4,info:#6C7086,query:#D7DDE6" \
+    --color "input-border:#D095A4,list-border:#3B4048,list-label:#D095A4,footer-border:#3B4048,footer-label:#6C7086" \
+    --color "preview-border:#3B4048,preview-label:#6C7086,header:#6C7086,header-border:#3B4048,header-label:#6C7086" >/dev/null
+}
+
+# ------------------------------------------------------------------ main
+case $1 in
+  --list) list "$2"; exit ;;
+  --reload) fetch_list; list; exit ;;
+  --preview) [ -n "$2" ] && { set_pr "$2" || exit; }; preview "$N"; exit ;;
+  --plabel) preview_label "$2"; exit ;;
+  --llabel) list_label "$2"; exit ;;
+  --colhead) colhead; exit ;;
+  --keys) keysheet; exit ;;
+  --sections-menu) sections_menu; exit ;;
+  --strip) strip; exit ;;
+  --main) run_main "$2"; exit ;;
+  --session) open_session; exit ;;
+  --show-keys)
+    tmux display-popup -E -w 116 -h 15 -b rounded -S "fg=#D095A4" -T "#[fg=#D095A4] keys #[fg=#6C7086]· any key closes " \
+      "STATE='$STATE' '$self' --keys"; exit ;;
+  --toggle-all)
+    if [ "$(state)" = all ]; then echo open >"$STATE/state"; else echo all >"$STATE/state"; fi
+    rm -f "$STATE/fresh"; setsid -f "$self" --fetch-all >/dev/null 2>&1; exit ;;
+  --next-acct)
+    mapfile -t accts <"$STATE/accounts"
+    cur=$(acct) nxt=""
+    if [ -z "$cur" ]; then nxt=${accts[0]:-}
+    else for i in "${!accts[@]}"; do [ "${accts[$i],,}" = "${cur,,}" ] && nxt=${accts[$((i + 1))]:-}; done; fi
+    printf '%s' "$nxt" >"$STATE/acct"; printf '%s' "$nxt" >"$CROOT/last-account"; build_sections; echo 0 >"$STATE/sec"; rm -f "$STATE/fresh" "$STATE/query"
+    setsid -f "$self" --fetch-all >/dev/null 2>&1; exit ;;
+  --search)
+    clear; printf '\n  %sSearch GitHub within %s%s%s\n  %se.g.  author:jiggy   label:bug   head:feat/x   "matchmaking"   (empty clears)%s\n\n  %s❯%s ' \
+      "$dim" "$gold" "$(secf "$(sec)" 1)" "$r" "$dim" "$r" "$rose" "$r"
+    read -re -i "$(query)" q || exit
+    printf '%s' "$q" >"$STATE/query"; rm -f "$STATE/fresh"; exit ;;
+  --mode) echo "$2" >"$STATE/mode"; exit ;;
+  --next-mode)
+    case $(mode) in overview) m=diff ;; diff) m=checks ;; checks) m=comments ;; *) m=overview ;; esac
+    echo "$m" >"$STATE/mode"; exit ;;
+  --next-state)
+    cur=$(state) nxt=${STATES[0]}
+    for i in "${!STATES[@]}"; do [ "${STATES[$i]}" = "$cur" ] && nxt=${STATES[$(( (i + 1) % ${#STATES[@]} ))]}; done
+    echo "$nxt" >"$STATE/state"; rm -f "$STATE/fresh"; setsid -f "$self" --fetch-all >/dev/null 2>&1; exit ;;
+  --section)
+    echo $(( ($(sec) + $2 + $(nsec)) % $(nsec) )) >"$STATE/sec"; rm -f "$STATE/fresh"
+    secf "$(sec)" 1 >"$CROOT/last-section"; exit ;;
+  --edit)
+    [ -f "$CONFIG" ] || default_config
+    "${VISUAL:-${EDITOR:-nvim}}" "$CONFIG" </dev/tty >/dev/tty
+    build_sections; rm -f "$STATE/fresh"; setsid -f "$self" --fetch-all >/dev/null 2>&1; exit ;;
+  --fetch-all) fetch_all; exit ;;
+  --fetch-pr) set_pr "$2" && fetch_pr "$N"; exit ;;
+  # First load shows the cached list; it then asks for the fresh one once.
+  # Every load updates the tabs and prefetches details in the background.
+  --on-load)
+    if [ ! -e "$STATE/fresh" ]; then
+      touch "$STATE/fresh"; echo "change-list-label($(list_label refreshing…))+reload-sync($self --reload)"; exit
+    fi
+    setsid -f "$self" --prefetch >/dev/null 2>&1
+    echo "change-list-label($(list_label))"; exit ;;
+  --copy)
+    set_pr "$2" && jq -r .url "$CACHE/$N.json" 2>/dev/null | clip && notify "$N" "Link copied"
+    exit ;;
+  --web) set_pr "$2" && gh pr view "$N" -R "$REPO" --web >/dev/null 2>&1; exit ;;
+  --prefetch) prefetch; exit ;;
+  --action) set_pr "$3" && action "$2" "$N"; exit ;;
+  --full) set_pr "$2" && open_full "$N"; exit ;;
+esac
+
+open_session
