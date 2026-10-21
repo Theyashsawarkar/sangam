@@ -25,8 +25,8 @@ PAGES = "https://theyashsawarkar.github.io"
 # The family: every project with a site like this one.
 FAMILY = [
     ("Desktop", [("vayu", "वायु", "the keyboard-driven Wayland desktop", "https://theyashsawarkar.github.io/vayu/")]),
-    ("Apps", [("nada", "नाद", "music player"), ("sangam", "संगम", "pull requests in the terminal"),
-              ("anumati", "अनुमति", "root commands for AI agents")]),
+    ("Apps", [("kosha", "कोश", "package manager"), ("nada", "नाद", "music player"),
+              ("sangam", "संगम", "pull requests in the terminal"), ("anumati", "अनुमति", "root commands for AI agents")]),
     ("Vyom", [("vyom", "व्योम", "panels runtime")]),
     ("Vyom tools", [("dvara", "द्वार", "apps"), ("ganit", "गणित", "calculator"), ("smriti", "स्मृति", "clipboard"),
                     ("bhava", "भाव", "emoji"), ("tarang", "तरंग", "Wi‑Fi"), ("setu", "सेतु", "Bluetooth"),
