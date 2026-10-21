@@ -13,7 +13,6 @@ family (Vayu's tools): change it in one, copy it to all.
 import html
 import os
 import re
-import shutil
 import sys
 import tomllib
 
@@ -287,7 +286,7 @@ def page(meta, title, body, depth=0, active="", toc=None, hero=""):
     tochtml = ""
     if toc:
         tochtml = '<aside class="toc"><b>On this page</b>' + "".join(
-            f'<a class="l{l}" href="#{s}">{html.escape(t)}</a>' for l, s, t in toc) + "</aside>"
+            f'<a class="l{lvl}" href="#{s}">{html.escape(t)}</a>' for lvl, s, t in toc) + "</aside>"
     fam = []
     for group, items in FAMILY:
         links = []
@@ -382,7 +381,6 @@ def build():
 
     # ---- home: the README without its banner/badges block
     body_md = readme
-    m = re.search(r"(?m)^(> |\S)", re.sub(r"(?s)^(<p align=\"center\">.*?</p>\s*)+", "", readme))
     stripped = re.sub(r"(?s)^(\s*<p align=\"center\">.*?</p>\s*)+", "", readme)
     # keep the first screenshot block for the page body if it was among the stripped ones
     shots = re.findall(r'(?s)<p align="center">\s*<img[^>]+assets/screenshots/[^>]+>.*?</p>', readme.split("\n## ")[0])
@@ -437,8 +435,11 @@ def build():
                                     f'<span style="color:var(--ov1);font:13px var(--mono)">ADR {num}{" · " + html.escape(date) if date else ""}</span></p><h2 ', 1).replace("</h1>", "</h2>", 1)
         nav = f'<p style="margin-top:40px"><a href="index.html">← All decisions</a> · <a href="{GH}/{name}/blob/main/docs/adr/{f}">source</a></p>'
         files[os.path.join("adr", out_name)] = page(meta, f"ADR {num}: {title} · {name}", adr_body + nav, 1, "adr").encode()
+        card_title = re.sub(r"^\d+\.\s*", "", title)
+        card_text = re.sub(r"[`*]", "", ctx)
+        card_text = card_text[:180] + ("…" if len(card_text) > 180 else "")
         cards.append(f'<a class="card" href="{out_name}"><div class="n">ADR {num} · <span class="status {st}">{html.escape(status)}</span></div>'
-                     f"<h3>{html.escape(re.sub(r'^\d+\.\s*', '', title))}</h3><p>{html.escape(re.sub(r'[`*]', '', ctx)[:180] + ('…' if len(ctx) > 180 else ''))}</p></a>")
+                     f"<h3>{html.escape(card_title)}</h3><p>{html.escape(card_text)}</p></a>")
     adr_intro = (f"<h2>Architecture decisions</h2><p>Why {name} is built the way it is: each significant decision as a short "
                  "record (context, the decision, its consequences), in the "
                  "<a href=\"https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions\">ADR</a> format. "
