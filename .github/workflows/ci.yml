@@ -22,3 +22,5 @@ jobs:
           make install DESTDIR="$RUNNER_TEMP/pkg" PREFIX=/usr
           test -x "$RUNNER_TEMP/pkg/usr/bin/sangam"
           test -f "$RUNNER_TEMP/pkg/usr/share/sangam/icon.png"
+      - name: Website is up to date
+        run: python3 scripts/build-site.py --check

@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sangam · Review and merge GitHub pull requests without leaving the terminal.</title>
+<meta name="description" content="Review and merge GitHub pull requests without leaving the terminal.">
+<meta property="og:title" content="sangam · Review and merge GitHub pull requests without leaving the terminal.">
+<meta property="og:description" content="Review and merge GitHub pull requests without leaving the terminal.">
+<meta name="theme-color" content="#11111b">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+<style>:root{--accent:#cba6f7;--glow:#cba6f733}</style>
+</head>
+<body>
+<header class="top"><div class="in">
+<a class="brand" href="index.html"><img src="assets/logo.svg" alt=""><span>sangam <small>संगम</small></span></a>
+<nav><a href="index.html" class="on">Overview</a><a href="changelog.html" class="">Changelog</a><a href="adr/index.html" class=" hide">Decisions</a><a class="gh" href="https://github.com/Theyashsawarkar/sangam">GitHub ↗</a></nav></div></header>
+<section class="hero"><div class="in"><div>
+<div class="eyebrow">pull requests</div>
+<h1>sangam</h1>
+<div class="sa">संगम <span>· “confluence”</span></div>
+<p class="lead">Review and merge GitHub pull requests without leaving the terminal.</p>
+<div class="cta"><a class="btn primary" href="#install">Install</a><a class="btn" href="https://github.com/Theyashsawarkar/sangam">GitHub ↗</a>
+<a class="btn" href="changelog.html">What's new in v2.0.1</a></div>
+<div class="meta"><span><b>v2.0.1</b> latest</span><span><b>3</b> releases</span><span><b>3</b> decisions recorded</span><span><b>MIT</b> license</span></div>
+</div><img class="logo" src="assets/logo.svg" alt="sangam logo"></div></section>
+<div class="wrap"><aside class="toc"><b>On this page</b><a class="l2" href="#features">Features</a><a class="l2" href="#install">Install</a><a class="l3" href="#requirements">Requirements</a><a class="l3" href="#quick-install">Quick install</a><a class="l3" href="#other-ways-to-install">Other ways to install</a><a class="l3" href="#update-and-uninstall">Update and uninstall</a><a class="l2" href="#getting-started">Getting started</a><a class="l2" href="#using-sangam">Using sangam</a><a class="l3" href="#the-screen">The screen</a><a class="l3" href="#sections">Sections</a><a class="l3" href="#accounts">Accounts</a><a class="l3" href="#finding-prs">Finding PRs</a><a class="l3" href="#reading-a-pr">Reading a PR</a><a class="l3" href="#reviewing">Reviewing</a><a class="l3" href="#merging">Merging</a><a class="l2" href="#keys">Keys</a><a class="l2" href="#command-line">Command line</a><a class="l2" href="#using-it-inside-tmux">Using it inside tmux</a><a class="l2" href="#files-and-environment">Files and environment</a><a class="l2" href="#how-it-works">How it works</a><a class="l2" href="#troubleshooting">Troubleshooting</a><a class="l2" href="#contributing">Contributing</a><a class="l2" href="#roadmap">Roadmap</a><a class="l2" href="#license">License</a></aside><article>
+<p align="center">
+  <img alt="sangam: section tabs on top, the pull requests of the current section on the left, the selected PR's overview on the right" src="assets/screenshots/overview.png" width="100%">
+</p>
+<blockquote><p><em>Sangam</em> (संगम) is Sanskrit for a confluence: the place where two rivers meet and flow on as one. Which is what a merge is.</p></blockquote>
+<p>sangam is a terminal UI for the part of the day spent on pull requests: finding the ones waiting for you, reading them, reviewing them and merging them. It runs like lazygit: type <code>sangam</code> in any terminal. It's built on the GitHub CLI (<code>gh</code>), fzf and tmux, so it uses your existing <code>gh</code> sign-in and needs no token, server or config to start.</p>
+<h2 id="features"><a class="anchor" href="#features">#</a>Features</h2>
+<p><strong>See everything that needs you</strong></p>
+<ul><li><strong>Sections, like saved searches.</strong> Each section is a GitHub search across all your repos: "review requested", "my PRs", one repo, a whole org, a label. Switch with <code>h</code>/<code>l</code>; each tab shows its count.</li><li><strong>Several GitHub accounts at once.</strong> Run each section as a different <code>gh</code> account, so work and personal PRs sit side by side. Press <code>u</code> to focus on one account.</li><li><strong>The repo you're in comes first.</strong> Start sangam inside a clone and a tab for that repo is added automatically.</li><li><strong>Open, merged, closed or all.</strong> <code>f</code> cycles the state for every section; <code>s</code> narrows a section with any GitHub search (<code>author:</code>, <code>label:</code>, <code>head:</code>, words...).</li></ul>
+<p><strong>Read a PR properly</strong></p>
+<ul><li><strong>Overview:</strong> state, author, branches, merge readiness, checks, reviews, size, labels, assignees, changed files and the description, laid out in one screen.</li><li><strong>Diff</strong> with syntax highlighting (via bat), <strong>checks</strong> with durations, and <strong>comments</strong>: the conversation plus review comments on the code, grouped by file and line.</li><li><strong>Failed CI logs, cleaned up.</strong> <code>Enter</code> on the checks view opens the failed jobs' logs with timestamps stripped and errors highlighted.</li></ul>
+<p><strong>Act on it</strong></p>
+<ul><li><strong>A merge panel that knows what the PR needs.</strong> It shows readiness (checks, review, conflicts, up to date, draft) and the commits that will land, then offers only what makes sense now: the merge methods the repo allows, update branch, auto-merge, an admin merge, mark ready, or check out to resolve conflicts.</li><li><strong>Approve, request changes, comment</strong> (in your <code>$EDITOR</code>), close or reopen, toggle draft, check out the branch, copy the link, open it in the browser.</li></ul>
+<p><strong>Fast and out of your way</strong></p>
+<ul><li>Cached lists show instantly and refresh in the background; the first PRs of a section are prefetched, so moving through them is instant.</li><li>Vim-style keys, <code>?</code> for a key sheet, <code>q</code> to quit.</li><li>Works in any terminal. Inside tmux it can also be a popup on a key (<a href="#using-it-inside-tmux">details</a>).</li></ul>
+<h2 id="install"><a class="anchor" href="#install">#</a>Install</h2>
+<h3 id="requirements"><a class="anchor" href="#requirements">#</a>Requirements</h3>
+<p>sangam is a Bash script. It runs on <strong>Linux</strong> (macOS isn't supported yet: it uses GNU tools, see the <a href="#roadmap">roadmap</a>).</p>
+<div class="table"><table><thead><tr><th>Tool</th><th>Version</th><th>What for</th></tr></thead><tbody><tr><td><a href="https://www.gnu.org/software/bash/">bash</a></td><td>4.4+</td><td>sangam itself</td></tr><tr><td><a href="https://cli.github.com">gh</a> (GitHub CLI)</td><td>2.40+</td><td>everything GitHub: sign-in, search, PR data, merging</td></tr><tr><td><a href="https://github.com/junegunn/fzf">fzf</a></td><td>0.66+</td><td>the list, preview and key handling</td></tr><tr><td><a href="https://github.com/tmux/tmux">tmux</a></td><td>3.3+</td><td>the layout (sangam runs its own private tmux server; you don't need to use tmux yourself)</td></tr><tr><td><a href="https://jqlang.org">jq</a></td><td>1.6+</td><td>reading GitHub's JSON</td></tr><tr><td>git, less</td><td>any</td><td>the repo you're in, full-screen views</td></tr><tr><td>GNU coreutils, GNU grep, util-linux</td><td>any</td><td>standard on Linux (<code>md5sum</code>, <code>stat</code>, <code>grep -P</code>, <code>setsid</code>)</td></tr></tbody></table></div>
+<p>Optional, but recommended:</p>
+<div class="table"><table><thead><tr><th>Tool</th><th>What you get</th></tr></thead><tbody><tr><td><a href="https://github.com/sharkdp/bat">bat</a></td><td>syntax-highlighted diffs and Markdown descriptions</td></tr><tr><td>A <a href="https://www.nerdfonts.com">Nerd Font</a> in your terminal</td><td>the icons (without one they show as boxes)</td></tr><tr><td><code>notify-send</code> (libnotify)</td><td>desktop notifications after merges, reviews and comments</td></tr><tr><td><code>wl-copy</code> (Wayland), <code>xclip</code> (X11)</td><td><code>y</code> copies a PR's link to the clipboard</td></tr></tbody></table></div>
+<p>Install them with your package manager:</p>
+<pre class="code" data-lang="sh"><code># Arch Linux
+sudo pacman -S --needed github-cli fzf tmux jq git bat libnotify wl-clipboard
+
+# Fedora
+sudo dnf install gh fzf tmux jq git bat libnotify wl-clipboard
+
+# Debian / Ubuntu (gh from GitHub&#x27;s apt repo: https://github.com/cli/cli/blob/trunk/docs/install_linux.md)
+sudo apt install gh tmux jq git bat libnotify-bin wl-clipboard</code></pre>
+<blockquote><p><strong>fzf version:</strong> Debian and Ubuntu ship an fzf older than 0.66. Install a current one from <a href="https://github.com/junegunn/fzf/releases">fzf's releases</a> (a single binary: put it in <code>~/.local/bin</code>) or with <code>git clone --depth 1 https://github.com/junegunn/fzf ~/.fzf &amp;&amp; ~/.fzf/install</code>. On Debian/Ubuntu, bat's command is <code>batcat</code>; link it: <code>ln -s /usr/bin/batcat ~/.local/bin/bat</code>.</p></blockquote>
+<p><code>sangam doctor</code> checks all of this for you.</p>
+<h3 id="quick-install"><a class="anchor" href="#quick-install">#</a>Quick install</h3>
+<pre class="code" data-lang="sh"><code>curl -fsSL https://raw.githubusercontent.com/Theyashsawarkar/sangam/main/install.sh | bash</code></pre>
+<p>This clones sangam into <code>~/.local/share/sangam</code>, links <code>~/.local/bin/sangam</code> to it, and runs <code>sangam doctor</code>. No root needed. If <code>~/.local/bin</code> isn't on your <code>PATH</code>, the installer tells you the line to add.</p>
+<p>Installer options (pass them after <code>bash -s --</code>):</p>
+<pre class="code" data-lang="sh"><code>curl -fsSL https://raw.githubusercontent.com/Theyashsawarkar/sangam/main/install.sh | bash -s -- --ref v2.0.0   # a specific release
+curl -fsSL https://raw.githubusercontent.com/Theyashsawarkar/sangam/main/install.sh | bash -s -- --bin-dir ~/bin</code></pre>
+<div class="table"><table><thead><tr><th>Option</th><th>Default</th><th></th></tr></thead><tbody><tr><td><code>--ref &lt;tag or branch&gt;</code></td><td><code>main</code></td><td>install a release (e.g. <code>v2.0.0</code>) instead of the latest code</td></tr><tr><td><code>--bin-dir &lt;dir&gt;</code></td><td><code>~/.local/bin</code></td><td>where the <code>sangam</code> link goes</td></tr><tr><td><code>--dir &lt;dir&gt;</code></td><td><code>~/.local/share/sangam</code></td><td>where sangam is cloned</td></tr><tr><td><code>--uninstall</code></td><td></td><td>remove the link and the clone</td></tr></tbody></table></div>
+<h3 id="other-ways-to-install"><a class="anchor" href="#other-ways-to-install">#</a>Other ways to install</h3>
+<p><strong>Arch Linux (package):</strong> a PKGBUILD that builds from the latest commit lives in <a href="https://github.com/Theyashsawarkar/sangam/blob/main/packaging/arch/PKGBUILD"><code>packaging/arch</code></a>. It pulls in every dependency and installs to <code>/usr</code>:</p>
+<pre class="code" data-lang="sh"><code>git clone https://github.com/Theyashsawarkar/sangam
+cd sangam/packaging/arch
+makepkg -si</code></pre>
+<p><strong>System-wide with make:</strong></p>
+<pre class="code" data-lang="sh"><code>git clone https://github.com/Theyashsawarkar/sangam
+cd sangam
+sudo make install                    # /usr/local/bin/sangam
+make install PREFIX=~/.local         # or just for you</code></pre>
+<p><code>make uninstall</code> (with the same <code>PREFIX</code>) removes it again.</p>
+<p><strong>By hand:</strong> sangam is one script. Clone the repo anywhere and link <code>bin/sangam</code> into your <code>PATH</code>:</p>
+<pre class="code" data-lang="sh"><code>git clone https://github.com/Theyashsawarkar/sangam ~/src/sangam
+ln -s ~/src/sangam/bin/sangam ~/.local/bin/sangam</code></pre>
+<p><strong>As a tmux plugin:</strong> see <a href="#using-it-inside-tmux">Using it inside tmux</a>.</p>
+<h3 id="update-and-uninstall"><a class="anchor" href="#update-and-uninstall">#</a>Update and uninstall</h3>
+<div class="table"><table><thead><tr><th>Installed with</th><th>Update</th><th>Uninstall</th></tr></thead><tbody><tr><td>the quick installer</td><td>run the install command again</td><td><code>… install.sh | bash -s -- --uninstall</code></td></tr><tr><td>the Arch PKGBUILD</td><td><code>makepkg -si</code> again in <code>packaging/arch</code> (after <code>git pull</code>)</td><td><code>sudo pacman -R sangam-git</code></td></tr><tr><td><code>make install</code></td><td><code>git pull &amp;&amp; sudo make install</code></td><td><code>sudo make uninstall</code></td></tr><tr><td>TPM (tmux)</td><td><code>prefix U</code></td><td>remove the <code>@plugin</code> line, then <code>prefix alt-u</code></td></tr></tbody></table></div>
+<p>Uninstalling leaves your sections (<code>~/.config/sangam</code>) and cache (<code>~/.cache/sangam</code>); delete them by hand if you want them gone.</p>
+<h2 id="getting-started"><a class="anchor" href="#getting-started">#</a>Getting started</h2>
+<ol><li><strong>Sign in to GitHub with gh</strong> (once):</li></ol>
+<p>``<code>sh gh auth login </code>``</p>
+<p>To use several accounts (say, work and personal), run <code>gh auth login</code> once per account. sangam uses all of them.</p>
+<ol><li><strong>Check the setup:</strong></li></ol>
+<p>``<code>sh sangam doctor </code>``</p>
+<p>``` sangam 2.0.0</p>
+<p>required ✓ bash          5.3.20(1)-release ✓ tmux          3.8 ✓ gh            2.102.0 ✓ fzf           0.74.5 ✓ jq            1.8.2 ✓ git           2.56.0 ✓ less          710 ✓ GNU tools     coreutils, grep -P, setsid</p>
+<p>GitHub ✓ signed in     work-account, personal-account</p>
+<p>optional ✓ bat           highlighted diffs and descriptions ✓ notify-send   desktop notifications ✓ clipboard     wl-copy ! Nerd Font     icons need a Nerd Font in your terminal (can't be checked from here)</p>
+<p>✓ ready: run sangam ```</p>
+<ol><li><strong>Run it</strong>, ideally from inside a repo you work on:</li></ol>
+<p>``<code>sh cd ~/code/my-project sangam </code>``</p>
+<p>You start in normal mode: <code>j</code>/<code>k</code> move through PRs, <code>h</code>/<code>l</code> switch sections, <code>1</code>–<code>4</code> switch what the right side shows, <code>m</code> merges, <code>?</code> shows every key, <code>q</code> quits.</p>
+<p>On first run sangam creates <code>~/.config/sangam/sections</code> with three sections: <strong>Review requested</strong>, <strong>My PRs</strong> and <strong>Involved</strong>. Make it yours next: see <a href="#sections">Sections</a>.</p>
+<h2 id="using-sangam"><a class="anchor" href="#using-sangam">#</a>Using sangam</h2>
+<h3 id="the-screen"><a class="anchor" href="#the-screen">#</a>The screen</h3>
+<pre class="code" data-lang=""><code>╭───────────────────────────────────────────────────────────────────────────────╮
+│ Review requested 3   My PRs 5   my-project (here) 2      󰀄 all accounts  ? keys │  ← section tabs
+╰───────────────────────────────────────────────────────────────────────────────╯
+╭─ Review requested · open · 3 ─────────╮╭─ repo · 1 overview 2 diff 3 checks ──╮
+│  #     title              author  age ││                                      │
+│ ▌#128  Add rate limiting  alice   2h  ││  the selected PR, in the view        │
+│  #127  Fix login redirect bob     1d  ││  you picked                          │
+╰───────────────────────────────────────╯╰──────────────────────────────────────╯
+  the PRs of the current section          overview · diff · checks · comments</code></pre>
+<ul><li><strong>Top:</strong> the sections as tabs, with their PR counts (<code>·</code> while loading). The current one is highlighted. On the right: the account you're focused on (<code>u</code>) and any GitHub search (<code>s</code>). Long section names shrink to their first word when the tabs don't fit.</li><li><strong>Left:</strong> the PRs of the current section, newest activity first: number, title (with a <code>draft</code> tag), author, age of the last update and the size (<code>+added −deleted</code>). In the "all" state, merged and closed PRs are tagged too.</li><li><strong>Right:</strong> the selected PR, in one of four views: <code>1</code> overview, <code>2</code> diff, <code>3</code> checks, <code>4</code> comments (<code>Tab</code> cycles them). <code>J</code>/<code>K</code> and <code>Ctrl+d</code>/<code>Ctrl+u</code> scroll it; <code>Enter</code> opens it full screen.</li></ul>
+<h3 id="sections"><a class="anchor" href="#sections">#</a>Sections</h3>
+<p>A section is a name, an optional account, and a GitHub search. They live in <code>~/.config/sangam/sections</code>, one per line:</p>
+<pre class="code" data-lang=""><code># name           | account    | GitHub search
+Review requested |            | review-requested:@me
+My PRs           |            | author:@me
+Involved         |            | involves:@me -author:@me
+Work: backend    | work-login | repo:acme/api repo:acme/worker
+Dependabot       |            | author:app/dependabot org:acme</code></pre>
+<ul><li><strong>name:</strong> the tab's label.</li><li><strong>account:</strong> a <code>gh</code> account (as <code>gh auth status</code> lists it), or empty for gh's active account. See <a href="#accounts">Accounts</a>.</li><li><strong>search:</strong> anything <a href="https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests">GitHub's search</a> takes. sangam adds <code>is:pr</code>, the state (open/merged/closed) and newest first, so leave those out. Several <code>repo:</code> filters in one search mean <em>any of these repos</em>.</li><li>Lines starting with <code>#</code> are comments.</li></ul>
+<p>Useful searches:</p>
+<div class="table"><table><thead><tr><th>You want</th><th>Search</th></tr></thead><tbody><tr><td>Waiting for your review</td><td><code>review-requested:@me</code></td></tr><tr><td>Waiting for your team's review</td><td><code>team-review-requested:acme/backend</code></td></tr><tr><td>Yours</td><td><code>author:@me</code></td></tr><tr><td>You're mentioned, assigned or commented</td><td><code>involves:@me</code></td></tr><tr><td>One repo / several</td><td><code>repo:acme/api</code> · <code>repo:acme/api repo:acme/web</code></td></tr><tr><td>A whole org</td><td><code>org:acme</code></td></tr><tr><td>A label</td><td><code>org:acme label:bug</code></td></tr><tr><td>Failing CI</td><td><code>author:@me status:failure</code></td></tr><tr><td>Approved, ready to go</td><td><code>author:@me review:approved</code></td></tr><tr><td>Drafts</td><td><code>author:@me draft:true</code></td></tr><tr><td>Bots</td><td><code>org:acme author:app/dependabot</code></td></tr><tr><td>Busy discussions</td><td><code>involves:@me comments:&gt;10</code></td></tr></tbody></table></div>
+<p><strong>Managing sections from inside sangam:</strong> press <code>S</code> for a menu to <strong>add</strong> a section (name, account picked from your signed-in ones, search), <strong>edit</strong> or <strong>delete</strong> the current one, move it <strong>left</strong> or <strong>right</strong>, or <strong>pin</strong> the repo you're in as a permanent section. <code>E</code> opens the file in your editor instead. Either way, sangam reloads right after.</p>
+<p><strong>The "here" tab:</strong> started inside a clone of a GitHub repo, sangam adds a "<em>repo</em> (here)" section for it (unless a section already searches exactly that repo), run as the folder's account (<code>git config github.user</code>, see below). sangam remembers the section you were on last.</p>
+<p><strong>How many PRs:</strong> each section shows up to 50 PRs, newest activity first. Narrow it with <code>s</code> or a more specific search to reach older ones.</p>
+<h3 id="accounts"><a class="anchor" href="#accounts">#</a>Accounts</h3>
+<p>sangam works with every account <code>gh</code> is signed in to (<code>gh auth status</code>):</p>
+<ul><li>A section with an account runs its search as that account. A section without one runs as gh's active account, so it follows <code>gh auth switch</code>.</li><li><code>u</code> focuses on one account: it cycles <strong>all accounts → each account → all</strong>. Focused on one, you see its sections plus the account-less ones run as it. The choice is remembered across runs (as long as that account is still signed in), and shown at the top right.</li><li>Every action (review, merge, comment...) runs as the account of the section you're in.</li><li>The "here" tab uses <code>git config github.user</code> of the folder you started in. If you keep work and personal code in different folders, set it per folder with git's <code>includeIf</code>:</li></ul>
+<p>``<code>ini # ~/.gitconfig [includeIf &quot;gitdir:~/work/&quot;] path = ~/.config/git/work.gitconfig     # contains: [github] user = work-login </code>``</p>
+<h3 id="finding-prs"><a class="anchor" href="#finding-prs">#</a>Finding PRs</h3>
+<ul><li><code>/</code> filters the list as you type, fuzzy, over what's on screen (number, title, author). <code>Enter</code> or <code>Esc</code> goes back to normal mode.</li><li><code>s</code> searches GitHub within the current section: anything GitHub search takes, such as <code>author:alice</code>, <code>label:bug</code>, <code>head:feature/x</code> or words from the title. It's added to the section's own search and shown at the top right. An empty search clears it. It lasts until you quit.</li><li><code>f</code> cycles the state for every section: <strong>open → merged → closed → all</strong>. <code>F</code> jumps between open and all.</li><li><code>R</code> reloads everything from GitHub (sangam also refreshes on its own whenever you open it or change section, state, account or search).</li></ul>
+<h3 id="reading-a-pr"><a class="anchor" href="#reading-a-pr">#</a>Reading a PR</h3>
+<p align="center">
+  <img alt="sangam showing a PR's diff, highlighted, next to the list" src="assets/screenshots/diff.png" width="100%">
+</p>
+<ul><li><strong><code>1</code> Overview:</strong> repo, number and title; a state badge (open, draft, merged, closed), author, how long ago it was opened and updated, and <code>branch → base</code> (fork PRs say so). Then <strong>status</strong>: whether it can merge and why not (needs review, changes requested, behind, conflicts...), checks passed/failed/running, reviews (who approved, who requested changes, who's still requested), size with a change bar, labels and assignees. Then the <strong>files</strong> with their +/− (long paths shortened in the middle), the <strong>description</strong> rendered as Markdown, and a count of comments.</li><li><strong><code>2</code> Diff:</strong> the whole diff, highlighted by bat.</li><li><strong><code>3</code> Checks:</strong> every check run, failed first, with its workflow and duration. <code>Enter</code> here opens the <strong>failed jobs' logs</strong>: grouped by job and step, timestamps removed, error lines in red.</li><li><strong><code>4</code> Comments:</strong> the conversation (comments and reviews with a body, oldest first) and the review comments on the code, grouped by file and line, replies marked.</li><li><strong><code>Enter</code></strong> opens the current view full screen in <code>less</code> (<code>q</code> returns).</li><li><strong><code>b</code></strong> opens the PR in your browser; <strong><code>y</code></strong> copies its link.</li></ul>
+<h3 id="reviewing"><a class="anchor" href="#reviewing">#</a>Reviewing</h3>
+<div class="table"><table><thead><tr><th>Key</th><th>What happens</th></tr></thead><tbody><tr><td><code>a</code></td><td><strong>Approve</strong>, with an optional one-line message (<code>Enter</code> approves, <code>Ctrl+c</code> cancels)</td></tr><tr><td><code>r</code></td><td><strong>Request changes</strong>: your <code>$EDITOR</code> opens; write the review above the marker line and save. Leave it empty to cancel.</td></tr><tr><td><code>c</code></td><td><strong>Comment</strong> on the PR, in your editor the same way</td></tr><tr><td><code>x</code></td><td><strong>Close</strong> the PR without merging (asks first, optional closing comment); on a closed PR, <strong>reopen</strong> it</td></tr><tr><td><code>d</code></td><td>Toggle between <strong>draft</strong> and <strong>ready for review</strong></td></tr><tr><td><code>o</code></td><td><strong>Check out</strong> the PR's branch (<code>gh pr checkout</code>): only inside a clone of the PR's repo, asks first</td></tr></tbody></table></div>
+<p>After each action the PR is re-read from GitHub, and you get a desktop notification if <code>notify-send</code> is installed.</p>
+<h3 id="merging"><a class="anchor" href="#merging">#</a>Merging</h3>
+<p align="center">
+  <img alt="The merge panel: readiness checklist, commits that land, and the merge options the repo allows" src="assets/screenshots/merge.png" width="100%">
+</p>
+<p><code>m</code> opens the merge panel for the selected PR. It reads the PR and the repo's merge settings fresh, then shows:</p>
+<ol><li><strong>Readiness:</strong> checks, review, conflicts, whether the branch is up to date with its base (and whether the repo requires that), and draft.</li><li><strong>The commits that will land.</strong></li><li><strong>What you can do now</strong>, and only that:</li></ol>
+<div class="table"><table><thead><tr><th>Key</th><th>Shown when</th><th>Does</th></tr></thead><tbody><tr><td><code>s</code></td><td>it's ready and the repo allows squash</td><td>squash and merge; you can edit the commit title (prefilled <code>Title (#123)</code>)</td></tr><tr><td><code>m</code></td><td>it's ready and the repo allows merge commits</td><td>create a merge commit</td></tr><tr><td><code>r</code></td><td>it's ready and the repo allows rebase</td><td>rebase and merge</td></tr><tr><td><code>u</code></td><td>the base moved on and the repo requires up-to-date branches</td><td>update the branch (merges the base in; checks run again)</td></tr><tr><td><code>a</code></td><td>it's blocked (checks or review pending) and the repo allows auto-merge</td><td>enable auto-merge: GitHub squash-merges it once everything passes</td></tr><tr><td><code>!</code></td><td>it's blocked and you're a repo admin</td><td>merge anyway as admin, bypassing branch protection</td></tr><tr><td><code>d</code></td><td>it's a draft</td><td>mark it ready for review</td></tr><tr><td><code>o</code></td><td>it has conflicts and you're in its clone</td><td>check out the branch to resolve them (outside its clone, sangam shows the <code>gh</code> command instead)</td></tr><tr><td><code>q</code> / <code>Esc</code></td><td>always</td><td>close the panel</td></tr></tbody></table></div>
+<p>Before merging, sangam asks whether to delete the branch on GitHub afterwards (unless the repo already does that, or the PR comes from a fork), then confirms once: <code>Enter</code> merges, <code>Esc</code> cancels. Your local checkout is never touched. The panel re-reads the PR after each step, so "update branch → enable auto-merge" works in one sitting.</p>
+<h2 id="keys"><a class="anchor" href="#keys">#</a>Keys</h2>
+<p>sangam opens in <strong>normal mode</strong>: letters are commands. <code>/</code> switches to typing a filter; <code>Enter</code> or <code>Esc</code> switches back.</p>
+<p><strong>Move and find</strong></p>
+<div class="table"><table><thead><tr><th>Key</th><th>Action</th></tr></thead><tbody><tr><td><code>j</code> / <code>k</code></td><td>next / previous PR</td></tr><tr><td><code>g</code> / <code>G</code></td><td>first / last PR</td></tr><tr><td><code>h</code> / <code>l</code></td><td>previous / next section</td></tr><tr><td><code>/</code></td><td>filter the list</td></tr><tr><td><code>s</code></td><td>search GitHub within the section</td></tr><tr><td><code>f</code></td><td>cycle open / merged / closed / all</td></tr><tr><td><code>F</code></td><td>toggle open ↔ all</td></tr><tr><td><code>u</code></td><td>switch account</td></tr><tr><td><code>R</code></td><td>reload from GitHub</td></tr><tr><td><code>S</code></td><td>add / edit / delete / move sections, pin this repo</td></tr><tr><td><code>E</code></td><td>edit the sections file</td></tr></tbody></table></div>
+<p><strong>Read</strong></p>
+<div class="table"><table><thead><tr><th>Key</th><th>Action</th></tr></thead><tbody><tr><td><code>1</code> <code>2</code> <code>3</code> <code>4</code></td><td>overview / diff / checks / comments</td></tr><tr><td><code>Tab</code></td><td>next view</td></tr><tr><td><code>J</code> / <code>K</code></td><td>scroll the preview down / up</td></tr><tr><td><code>Ctrl+d</code> / <code>Ctrl+u</code></td><td>scroll half a page</td></tr><tr><td><code>Enter</code></td><td>current view full screen (failed logs in checks)</td></tr><tr><td><code>b</code></td><td>open in the browser</td></tr><tr><td><code>y</code></td><td>copy the link</td></tr></tbody></table></div>
+<p><strong>Act</strong></p>
+<div class="table"><table><thead><tr><th>Key</th><th>Action</th></tr></thead><tbody><tr><td><code>m</code></td><td>merge panel</td></tr><tr><td><code>a</code></td><td>approve</td></tr><tr><td><code>r</code></td><td>request changes</td></tr><tr><td><code>c</code></td><td>comment</td></tr><tr><td><code>x</code></td><td>close / reopen</td></tr><tr><td><code>o</code></td><td>check out the branch (in its clone)</td></tr><tr><td><code>d</code></td><td>draft ↔ ready for review</td></tr><tr><td><code>?</code></td><td>show every key</td></tr><tr><td><code>q</code> / <code>Esc</code></td><td>quit</td></tr></tbody></table></div>
+<p>The merge panel's own keys are listed under <a href="#merging">Merging</a>.</p>
+<h2 id="command-line"><a class="anchor" href="#command-line">#</a>Command line</h2>
+<pre class="code" data-lang=""><code>sangam               open it in this folder (any terminal, in tmux or not)
+sangam -C &lt;dir&gt;      open it as if started in &lt;dir&gt;
+sangam doctor        check the dependencies and the GitHub sign-in
+sangam --version     print the version
+sangam --help        show the help</code></pre>
+<p><code>sangam doctor</code> exits non-zero when something required is missing, so it also works in scripts.</p>
+<h2 id="using-it-inside-tmux"><a class="anchor" href="#using-it-inside-tmux">#</a>Using it inside tmux</h2>
+<p>sangam doesn't need tmux to be your terminal setup: it runs its own private tmux server for its layout, with its own socket and none of your tmux config. Run it in a tmux pane like any other program.</p>
+<p>If you do use tmux, sangam can also be a <strong>popup on a key</strong>: <code>prefix G</code> opens it over whatever you're doing, in the current pane's folder, and <code>prefix G</code> again closes it.</p>
+<p><strong>With <a href="https://github.com/tmux-plugins/tpm">TPM</a>:</strong> add this to your tmux config, above TPM's <code>run</code> line, then press <code>prefix I</code>:</p>
+<pre class="code" data-lang="tmux"><code>set -g @plugin &#x27;Theyashsawarkar/sangam&#x27;</code></pre>
+<p>TPM keeps its own copy in <code>~/.tmux/plugins/sangam</code>; you don't need the <code>sangam</code> command installed separately for the popup.</p>
+<p><strong>Without TPM:</strong> with sangam cloned somewhere, add:</p>
+<pre class="code" data-lang="tmux"><code>run-shell ~/path/to/sangam/sangam.tmux</code></pre>
+<p><strong>Options</strong> (set them before TPM's <code>run</code> line):</p>
+<div class="table"><table><thead><tr><th>Option</th><th>Default</th><th></th></tr></thead><tbody><tr><td><code>@sangam-key</code></td><td><code>G</code></td><td>key after the prefix that opens the popup (and closes it from inside); <code>none</code> binds nothing</td></tr><tr><td><code>@sangam-width</code></td><td><code>90%</code></td><td>popup width</td></tr><tr><td><code>@sangam-height</code></td><td><code>88%</code></td><td>popup height</td></tr><tr><td><code>@sangam-title</code></td><td><code> sangam </code></td><td>popup title</td></tr><tr><td><code>@sangam-launcher</code></td><td></td><td>your own popup command instead of <code>display-popup</code>. It's run with display-popup's arguments appended (<code>-E -d DIR -T TITLE CMD</code>), tmux formats expanded</td></tr></tbody></table></div>
+<p>For example, <code>P</code> instead of <code>G</code>, and a popup helper of your own:</p>
+<pre class="code" data-lang="tmux"><code>set -g @sangam-key &#x27;P&#x27;
+set -g @sangam-launcher &quot;~/.tmux/scripts/popup.sh &#x27;#{client_name}&#x27;&quot;</code></pre>
+<h2 id="files-and-environment"><a class="anchor" href="#files-and-environment">#</a>Files and environment</h2>
+<div class="table"><table><thead><tr><th>Path</th><th>What</th></tr></thead><tbody><tr><td><code>~/.config/sangam/sections</code></td><td>your sections (<a href="#sections">format</a>)</td></tr><tr><td><code>~/.cache/sangam/</code></td><td>cached lists and PR details (safe to delete), the last section and account</td></tr><tr><td><code>$XDG_RUNTIME_DIR/sangam.XXXXXX/</code></td><td>one run's state and its private tmux socket, removed on quit</td></tr></tbody></table></div>
+<p>sangam respects <code>XDG_CONFIG_HOME</code> and <code>XDG_CACHE_HOME</code>. Other variables:</p>
+<div class="table"><table><thead><tr><th>Variable</th><th>Used for</th></tr></thead><tbody><tr><td><code>VISUAL</code>, <code>EDITOR</code></td><td>writing reviews and comments, editing the sections file (default <code>vi</code>)</td></tr><tr><td><code>BAT_THEME</code></td><td>the colors of diffs and descriptions (any <code>bat --list-themes</code> theme)</td></tr><tr><td><code>GH_CONFIG_DIR</code>, <code>GH_TOKEN</code></td><td>passed through to gh as usual (sections with an account use that account's token)</td></tr></tbody></table></div>
+<p>Upgrading from <strong>tmux-gh-pr</strong> (sangam's earlier name): your <code>~/.config/gh-pr/sections</code> is copied to <code>~/.config/sangam/sections</code> the first time sangam runs. In tmux, replace <code>Theyashsawarkar/tmux-gh-pr</code> with <code>Theyashsawarkar/sangam</code> and rename any <code>@gh-pr-*</code> options to <code>@sangam-*</code>.</p>
+<h2 id="how-it-works"><a class="anchor" href="#how-it-works">#</a>How it works</h2>
+<p>sangam is a single Bash script that calls itself for each part of the screen:</p>
+<ul><li>On start it builds the sections (your file, the "here" repo, the account focus), then starts a <strong>private tmux server</strong> with one session: a 3-line pane for the tabs and a pane running <strong>fzf</strong> for the list. fzf draws the preview by calling <code>sangam --preview &lt;repo#number&gt;</code>, and its key bindings call back into sangam for every action. That split is what lets the tabs span both the list and the preview.</li><li>Each section is <strong>one GraphQL search</strong> (<code>gh api graphql</code>) that brings the list with CI and review state in a single request. All sections are fetched in parallel in the background at start, so tab counts fill in and switching sections is instant.</li><li>PR details (<code>gh pr view</code>), diffs and review comments are cached per PR in <code>~/.cache/sangam</code> and prefetched for the first PRs of a section. Cached data shows first; fresh data replaces it as it arrives.</li><li>Actions are plain <code>gh</code> commands (<code>gh pr merge</code>, <code>gh pr review</code>, <code>gh api ...</code>), run with the section's account token (<code>gh auth token --user</code>). sangam never stores a token itself.</li><li>Quitting fzf kills the private tmux server and removes the run's state.</li></ul>
+<h2 id="troubleshooting"><a class="anchor" href="#troubleshooting">#</a>Troubleshooting</h2>
+<p><strong>"gh isn't signed in to github.com"</strong> Run <code>gh auth login</code>. sangam only talks to github.com (not GitHub Enterprise Server yet).</p>
+<p><strong>Icons show as boxes or question marks</strong> Your terminal's font isn't a <a href="https://www.nerdfonts.com">Nerd Font</a>. Install one (e.g. JetBrainsMono Nerd Font) and select it in your terminal's settings.</p>
+<p><strong>Colors look washed out or wrong</strong> Your terminal needs truecolor (24-bit) support, which every modern terminal has. If it's set up but not advertised, export <code>COLORTERM=truecolor</code> in your shell's rc file.</p>
+<p><strong><code>sangam doctor</code> says fzf is too old</strong> Your distribution's fzf predates 0.66 (common on Debian and Ubuntu). See <a href="#requirements">Requirements</a> for getting a current one.</p>
+<p><strong>A section always shows 0</strong> Try its search on github.com (pull requests tab) or with <code>gh search prs &quot;&lt;search&gt;&quot;</code>. If it finds PRs there, check the section's account: it needs access to those repos (private repos, org SSO). For an org with SAML SSO, authorize gh's token for it in your GitHub settings (Settings → Applications → Authorized OAuth Apps → GitHub CLI → Grant).</p>
+<p><strong><code>o</code> (checkout) says it only works inside a clone</strong> Checkout switches the branch of the folder sangam was started in, so start sangam inside a clone of that PR's repo (or use <code>sangam -C &lt;clone&gt;</code>).</p>
+<p><strong>The diff or description has no colors</strong> Install <code>bat</code>. On Debian/Ubuntu it's called <code>batcat</code>; link it as <code>bat</code> (see <a href="#requirements">Requirements</a>).</p>
+<p><strong>The tmux popup opens but <code>prefix G</code> doesn't close it</strong> Close it with <code>q</code>. The popup uses your tmux prefix at the time it opened; if you changed your prefix since, reopen it. If you changed the key, set <code>@sangam-key</code> before TPM's <code>run</code> line, then reload tmux.</p>
+<p><strong>Something else</strong> Run <code>sangam doctor</code>, then <a href="https://github.com/Theyashsawarkar/sangam/issues">open an issue</a> with its output and what you did.</p>
+<h2 id="contributing"><a class="anchor" href="#contributing">#</a>Contributing</h2>
+<p>Bug reports, ideas and pull requests are welcome. Before a PR:</p>
+<pre class="code" data-lang="sh"><code>make check        # shellcheck + syntax + CLI smoke test (what CI runs)</code></pre>
+<p>Test changes by hand too: run <code>bin/sangam</code> from your clone. For the tmux popup, use a throwaway tmux server so your real one isn't touched:</p>
+<pre class="code" data-lang="sh"><code>tmux -L test -f /dev/null new -s t
+tmux -L test run-shell &quot;$PWD/sangam.tmux&quot;     # then prefix (Ctrl+b) G</code></pre>
+<p><a href="https://github.com/Theyashsawarkar/pr-playground">Theyashsawarkar/pr-playground</a> is a public repo with one open PR per merge situation (clean, conflicting, behind its base, failing CI, draft, waiting for a review), handy for trying the merge panel. Every change gets an entry in <a href="changelog.html">CHANGELOG.md</a>. More notes for contributors (and AI coding agents) are in <a href="https://github.com/Theyashsawarkar/sangam/blob/main/CLAUDE.md">CLAUDE.md</a>.</p>
+<h2 id="roadmap"><a class="anchor" href="#roadmap">#</a>Roadmap</h2>
+<ul><li>macOS support (BSD <code>stat</code>/<code>mktemp</code>/<code>grep</code>, no <code>setsid</code>)</li><li>AUR package and Homebrew formula</li><li>GitHub Enterprise Server hosts</li><li>Configurable colors (it uses a Catppuccin-like palette today)</li></ul>
+<h2 id="license"><a class="anchor" href="#license">#</a>License</h2>
+<p><a href="https://github.com/Theyashsawarkar/sangam/blob/main/LICENSE">MIT</a>. sangam is part of <a href="https://github.com/Theyashsawarkar/vayu">Vayu</a>, a keyboard-driven Arch Linux desktop, and works anywhere on its own. Built on the shoulders of <a href="https://cli.github.com">gh</a>, <a href="https://github.com/junegunn/fzf">fzf</a>, <a href="https://github.com/tmux/tmux">tmux</a>, <a href="https://jqlang.org">jq</a> and <a href="https://github.com/sharkdp/bat">bat</a>.</p>
+</article></div>
+<footer><div class="in"><div><h4>Desktop</h4><a href="https://theyashsawarkar.github.io/vayu/" class="">vayu <span>वायु · the keyboard-driven Wayland desktop</span></a></div><div><h4>Apps</h4><a href="https://theyashsawarkar.github.io/nada/" class="">nada <span>नाद · music player</span></a><a href="https://theyashsawarkar.github.io/sangam/" class="me">sangam <span>संगम · pull requests in the terminal</span></a><a href="https://theyashsawarkar.github.io/anumati/" class="">anumati <span>अनुमति · root commands for AI agents</span></a></div><div><h4>Vyom</h4><a href="https://theyashsawarkar.github.io/vyom/" class="">vyom <span>व्योम · panels runtime</span></a></div><div><h4>Vyom tools</h4><a href="https://theyashsawarkar.github.io/dvara/" class="">dvara <span>द्वार · apps</span></a><a href="https://theyashsawarkar.github.io/ganit/" class="">ganit <span>गणित · calculator</span></a><a href="https://theyashsawarkar.github.io/smriti/" class="">smriti <span>स्मृति · clipboard</span></a><a href="https://theyashsawarkar.github.io/bhava/" class="">bhava <span>भाव · emoji</span></a><a href="https://theyashsawarkar.github.io/tarang/" class="">tarang <span>तरंग · Wi‑Fi</span></a><a href="https://theyashsawarkar.github.io/setu/" class="">setu <span>सेतु · Bluetooth</span></a><a href="https://theyashsawarkar.github.io/doot/" class="">doot <span>दूत · phone</span></a><a href="https://theyashsawarkar.github.io/patra/" class="">patra <span>पात्र · Docker</span></a><a href="https://theyashsawarkar.github.io/suchana/" class="">suchana <span>सूचना · notifications</span></a><a href="https://theyashsawarkar.github.io/raga/" class="">raga <span>राग · YouTube</span></a><a href="https://theyashsawarkar.github.io/mudra/" class="">mudra <span>मुद्रा · keybindings</span></a><a href="https://theyashsawarkar.github.io/urja/" class="">urja <span>ऊर्जा · battery</span></a><a href="https://theyashsawarkar.github.io/vishram/" class="">vishram <span>विश्राम · power menu</span></a><a href="https://theyashsawarkar.github.io/kendra/" class="">kendra <span>केन्द्र · quick settings</span></a></div></div>
+<div class="bottom">sangam is free software under the MIT license · <a href="https://github.com/Theyashsawarkar/sangam">source</a> · <a href="https://github.com/Theyashsawarkar/sangam/issues">issues</a> · <a href="changelog.html">changelog</a> · part of <a href="https://theyashsawarkar.github.io/vayu/">Vayu</a></div></footer>
+<script>
+document.querySelectorAll('pre.code').forEach(p=>{const b=document.createElement('button');b.className='copy';b.textContent='Copy';
+b.onclick=()=>{navigator.clipboard.writeText(p.innerText.replace(/^Copy/,'')).then(()=>{b.textContent='Copied';setTimeout(()=>b.textContent='Copy',1200)})};p.appendChild(b)});
+const links=[...document.querySelectorAll('.toc a')];if(links.length){const hs=links.map(a=>document.getElementById(a.hash.slice(1))).filter(Boolean);
+const on=()=>{let cur=hs[0];for(const h of hs){if(h.getBoundingClientRect().top<120)cur=h}links.forEach(a=>a.classList.toggle('on',cur&&a.hash==='#'+cur.id))};
+addEventListener('scroll',on,{passive:true});on()}
+</script>
+</body>
+</html>

@@ -30,3 +30,4 @@ through the `@sangam-*` options.
 - Theyashsawarkar/pr-playground is a public test repo with one PR per
   merge situation. Screenshots (assets/screenshots) are taken with a
   sections file that only searches it, so no private PRs leak into them.
+- The website (docs/, GitHub Pages) is generated: after changing README.md, CHANGELOG.md or docs/adr/, run `python3 scripts/build-site.py` and commit docs/ (CI checks it). A significant design decision gets a new ADR in docs/adr/ (next number; supersede, never rewrite).

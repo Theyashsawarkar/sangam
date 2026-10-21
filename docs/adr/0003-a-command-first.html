@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADR 0003: 3. A command first, a tmux popup second · sangam</title>
+<meta name="description" content="Review and merge GitHub pull requests without leaving the terminal.">
+<meta property="og:title" content="ADR 0003: 3. A command first, a tmux popup second · sangam">
+<meta property="og:description" content="Review and merge GitHub pull requests without leaving the terminal.">
+<meta name="theme-color" content="#11111b">
+<link rel="icon" href="../assets/logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+<style>:root{--accent:#cba6f7;--glow:#cba6f733}</style>
+</head>
+<body>
+<header class="top"><div class="in">
+<a class="brand" href="../index.html"><img src="../assets/logo.svg" alt=""><span>sangam <small>संगम</small></span></a>
+<nav><a href="../index.html" class="">Overview</a><a href="../changelog.html" class="">Changelog</a><a href="../adr/index.html" class="on hide">Decisions</a><a class="gh" href="https://github.com/Theyashsawarkar/sangam">GitHub ↗</a></nav></div></header>
+
+<div class="wrap"><aside class="toc"></aside><article>
+<p class="n"><span class="status accepted">Accepted</span> <span style="color:var(--ov1);font:13px var(--mono)">ADR 0003 · 2026-10-17</span></p><h2 id="3-a-command-first-a-tmux-popup-second"><a class="anchor" href="#3-a-command-first-a-tmux-popup-second">#</a>3. A command first, a tmux popup second</h2>
+<h2 id="context"><a class="anchor" href="#context">#</a>Context</h2>
+<p>It began as a tmux plugin; but reviewing PRs is useful outside tmux.</p>
+<h2 id="decision"><a class="anchor" href="#decision">#</a>Decision</h2>
+<p>sangam is a standalone command with an installer and <code>make install</code>; the tmux plugin is one way to open it.</p>
+<h2 id="consequences"><a class="anchor" href="#consequences">#</a>Consequences</h2>
+<ul><li>Runs in any terminal.</li><li>The tmux plugin links TPM's copy onto PATH.</li></ul><p style="margin-top:40px"><a href="index.html">← All decisions</a> · <a href="https://github.com/Theyashsawarkar/sangam/blob/main/docs/adr/0003-a-command-first.md">source</a></p>
+</article></div>
+<footer><div class="in"><div><h4>Desktop</h4><a href="https://theyashsawarkar.github.io/vayu/" class="">vayu <span>वायु · the keyboard-driven Wayland desktop</span></a></div><div><h4>Apps</h4><a href="https://theyashsawarkar.github.io/nada/" class="">nada <span>नाद · music player</span></a><a href="https://theyashsawarkar.github.io/sangam/" class="me">sangam <span>संगम · pull requests in the terminal</span></a><a href="https://theyashsawarkar.github.io/anumati/" class="">anumati <span>अनुमति · root commands for AI agents</span></a></div><div><h4>Vyom</h4><a href="https://theyashsawarkar.github.io/vyom/" class="">vyom <span>व्योम · panels runtime</span></a></div><div><h4>Vyom tools</h4><a href="https://theyashsawarkar.github.io/dvara/" class="">dvara <span>द्वार · apps</span></a><a href="https://theyashsawarkar.github.io/ganit/" class="">ganit <span>गणित · calculator</span></a><a href="https://theyashsawarkar.github.io/smriti/" class="">smriti <span>स्मृति · clipboard</span></a><a href="https://theyashsawarkar.github.io/bhava/" class="">bhava <span>भाव · emoji</span></a><a href="https://theyashsawarkar.github.io/tarang/" class="">tarang <span>तरंग · Wi‑Fi</span></a><a href="https://theyashsawarkar.github.io/setu/" class="">setu <span>सेतु · Bluetooth</span></a><a href="https://theyashsawarkar.github.io/doot/" class="">doot <span>दूत · phone</span></a><a href="https://theyashsawarkar.github.io/patra/" class="">patra <span>पात्र · Docker</span></a><a href="https://theyashsawarkar.github.io/suchana/" class="">suchana <span>सूचना · notifications</span></a><a href="https://theyashsawarkar.github.io/raga/" class="">raga <span>राग · YouTube</span></a><a href="https://theyashsawarkar.github.io/mudra/" class="">mudra <span>मुद्रा · keybindings</span></a><a href="https://theyashsawarkar.github.io/urja/" class="">urja <span>ऊर्जा · battery</span></a><a href="https://theyashsawarkar.github.io/vishram/" class="">vishram <span>विश्राम · power menu</span></a><a href="https://theyashsawarkar.github.io/kendra/" class="">kendra <span>केन्द्र · quick settings</span></a></div></div>
+<div class="bottom">sangam is free software under the MIT license · <a href="https://github.com/Theyashsawarkar/sangam">source</a> · <a href="https://github.com/Theyashsawarkar/sangam/issues">issues</a> · <a href="../changelog.html">changelog</a> · part of <a href="https://theyashsawarkar.github.io/vayu/">Vayu</a></div></footer>
+<script>
+document.querySelectorAll('pre.code').forEach(p=>{const b=document.createElement('button');b.className='copy';b.textContent='Copy';
+b.onclick=()=>{navigator.clipboard.writeText(p.innerText.replace(/^Copy/,'')).then(()=>{b.textContent='Copied';setTimeout(()=>b.textContent='Copy',1200)})};p.appendChild(b)});
+const links=[...document.querySelectorAll('.toc a')];if(links.length){const hs=links.map(a=>document.getElementById(a.hash.slice(1))).filter(Boolean);
+const on=()=>{let cur=hs[0];for(const h of hs){if(h.getBoundingClientRect().top<120)cur=h}links.forEach(a=>a.classList.toggle('on',cur&&a.hash==='#'+cur.id))};
+addEventListener('scroll',on,{passive:true});on()}
+</script>
+</body>
+</html>

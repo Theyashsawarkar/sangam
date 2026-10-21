@@ -69,7 +69,7 @@ b=$'\e[1m' r=$'\e[0m' key=$'\e[1;38;2;208;149;164m'
 
 STATES=(open merged closed all)
 NORMAL_KEYS='j,k,g,G,h,l,J,K,1,2,3,4,f,F,u,s,S,R,E,m,a,r,c,x,o,d,y,b,q,/,?'
-VERSION=2.0.0
+VERSION=2.0.1
 CONFIG=${XDG_CONFIG_HOME:-$HOME/.config}/sangam/sections
 CROOT=${XDG_CACHE_HOME:-$HOME/.cache}/sangam
 # Sections from before the rename (tmux-gh-pr) carry over once.

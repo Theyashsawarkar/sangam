@@ -1,0 +1,8 @@
+# The project website (docs/, GitHub Pages): built by scripts/build-site.py
+name = "sangam"
+sanskrit = "संगम"
+meaning = "confluence"
+tagline = "Review and merge GitHub pull requests without leaving the terminal."
+color = "mauve"
+kind = "pull requests"
+logo = "assets/icon.svg"

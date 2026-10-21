@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 140" width="640" height="140">
+  <title>sangam</title>
+  <defs>
+    <linearGradient id="w" x1="0" y1="0" x2="470" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8839ef"/><stop offset="1" stop-color="#dc8a78"/>
+    </linearGradient>
+  </defs>
+  <!-- The icon, inlined so the banner is one file. -->
+  <g id="icon" transform="translate(6 6)">
+    <defs>
+      <linearGradient id="ig" x1="0" y1="0" x2="128" y2="0" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#cba6f7"/><stop offset="1" stop-color="#f5e0dc"/>
+      </linearGradient>
+      <radialGradient id="iglow" cx="78" cy="64" r="60" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#cba6f7" stop-opacity=".22"/><stop offset="1" stop-color="#cba6f7" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <rect x="2" y="2" width="124" height="124" rx="30" fill="#1e1e2e" stroke="#cba6f7" stroke-opacity=".28" stroke-width="2"/>
+    <rect x="2" y="2" width="124" height="124" rx="30" fill="url(#iglow)"/>
+    <g fill="none" stroke="url(#ig)" stroke-linecap="round" stroke-linejoin="round" stroke-width="8">
+      <path d="M28 38 C52 38 54 64 78 64"/>
+      <path d="M28 90 C52 90 54 64 78 64"/>
+      <path d="M78 64 H98"/>
+    </g>
+    <g fill="url(#ig)">
+      <circle cx="28" cy="38" r="7"/>
+      <circle cx="28" cy="90" r="7"/>
+      <circle cx="100" cy="64" r="10"/>
+    </g>
+  </g>
+  <!-- SANGAM in the Vayu logo's line style, over two streams that merge. -->
+  <g transform="translate(168 30)" fill="none" stroke="url(#w)" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke-width="5">
+      <path d="M42 8 C38 2 31 0 22 0 C10 0 3 6 3 13.5 C3 22 12 24 22 26 C32 28 41 30.5 41 39 C41 47 33 52 22 52 C12 52 5 49 1 43"/>
+      <path transform="translate(80 0)" d="M0 52 L22 0 L44 52"/>
+      <path transform="translate(160 0)" d="M0 52 V0 L44 52 V0"/>
+      <path transform="translate(240 0)" d="M43 9 C39 3 32 0 25 0 C11 0 1 11 1 26 C1 41 11 52 25 52 C36 52 44 45 44 33 V29 H27"/>
+      <path transform="translate(320 0)" d="M0 52 L22 0 L44 52"/>
+      <path transform="translate(400 0)" d="M0 52 V0 L22 30 L44 0 V52"/>
+    </g>
+    <g stroke-width="3.5">
+      <path d="M-4 72 H150 C196 72 206 82 250 82 H430"/>
+      <path d="M-4 92 H150 C196 92 206 82 250 82"/>
+    </g>
+    <circle cx="438" cy="82" r="5" fill="url(#w)" stroke="none"/>
+  </g>
+</svg>

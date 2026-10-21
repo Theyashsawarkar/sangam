@@ -2,6 +2,12 @@
 
 Newest first.
 
+## v2.0.1 -- 2026-10-21
+
+- A website (GitHub Pages, https://theyashsawarkar.github.io/sangam/): the README as a home page, the
+  changelog, and architecture decision records (`docs/adr/`), built from these files by
+  `scripts/build-site.py`; CI checks the site is up to date.
+
 ## v2.0.0 -- 2026-10-19
 
 tmux-gh-pr is now **sangam**: a command-line tool first, a tmux popup
