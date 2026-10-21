@@ -25,7 +25,8 @@ PAGES = "https://theyashsawarkar.github.io"
 FAMILY = [
     ("Desktop", [("vayu", "वायु", "the keyboard-driven Wayland desktop", "https://theyashsawarkar.github.io/vayu/")]),
     ("Apps", [("kosha", "कोश", "package manager"), ("nada", "नाद", "music player"),
-              ("sangam", "संगम", "pull requests in the terminal"), ("anumati", "अनुमति", "root commands for AI agents")]),
+              ("sangam", "संगम", "pull requests in the terminal"), ("anumati", "अनुमति", "root commands for AI agents"),
+              ("vesha", "वेष", "Claude Code accounts")]),
     ("Vyom", [("vyom", "व्योम", "panels runtime")]),
     ("Vyom tools", [("dvara", "द्वार", "apps"), ("ganit", "गणित", "calculator"), ("smriti", "स्मृति", "clipboard"),
                     ("bhava", "भाव", "emoji"), ("tarang", "तरंग", "Wi‑Fi"), ("setu", "सेतु", "Bluetooth"),
@@ -383,7 +384,8 @@ def build():
     body_md = readme
     stripped = re.sub(r"(?s)^(\s*<p align=\"center\">.*?</p>\s*)+", "", readme)
     # keep the first screenshot block for the page body if it was among the stripped ones
-    shots = re.findall(r'(?s)<p align="center">\s*<img[^>]+assets/screenshots/[^>]+>.*?</p>', readme.split("\n## ")[0])
+    shots = [m for m in re.findall(r'(?s)<p align="center">\s*<img[^>]+assets/screenshots/[^>]+>.*?</p>', readme.split("\n## ")[0])
+             if m not in stripped]
     body_md = ("\n\n".join(shots) + "\n\n" + stripped) if shots else stripped
     body_md = re.sub(r"(?ms)^## Contents\s*\n.*?(?=^## )", "", body_md)
     toc = []
