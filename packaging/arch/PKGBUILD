@@ -3,7 +3,7 @@
 #   cd packaging/arch && makepkg -si
 pkgname=sangam-git
 _pkgname=sangam
-pkgver=2.0.0
+pkgver=2.0.2
 pkgrel=1
 pkgdesc="Review and merge GitHub pull requests from the terminal (TUI over gh, fzf and tmux)"
 arch=('any')

@@ -52,6 +52,7 @@ and needs no token, server or config to start.
 - [Keys](#keys)
 - [Command line](#command-line)
 - [Using it inside tmux](#using-it-inside-tmux)
+- [Colours](#colours)
 - [Files and environment](#files-and-environment)
 - [How it works](#how-it-works)
 - [Troubleshooting](#troubleshooting)
@@ -568,6 +569,14 @@ For example, `P` instead of `G`, and a popup helper of your own:
 set -g @sangam-key 'P'
 set -g @sangam-launcher "~/.tmux/scripts/popup.sh '#{client_name}'"
 ```
+
+## Colours
+
+sangam has its own palette. With [varna](https://github.com/Theyashsawarkar/varna)
+(a theme engine) installed, it takes the current theme's colours instead:
+it reads `~/.local/state/varna/fzf.sh` at start (the list, borders, badges,
+review states, section tabs and the key sheet), so switching the theme
+recolours the next sangam you open.
 
 ## Files and environment
 

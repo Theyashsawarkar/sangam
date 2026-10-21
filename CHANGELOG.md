@@ -2,6 +2,14 @@
 
 Newest first.
 
+## v2.0.2 -- 2026-10-21
+
+- **Follows your theme**: with [varna](https://github.com/Theyashsawarkar/varna)
+  installed, sangam takes the current theme's colours (fzf's list and
+  borders, the PR state badges, review states, section tabs, the commit line
+  and the key sheet) instead of its fixed palette; without it, nothing
+  changes. All colours now come from one place at the top of the script.
+
 ## v2.0.1 -- 2026-10-21
 
 - A website (GitHub Pages, https://theyashsawarkar.github.io/sangam/): the README as a home page, the

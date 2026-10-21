@@ -62,14 +62,28 @@ if ! command -v gh >/dev/null; then
   export PATH
 fi
 
-rose=$'\e[38;2;208;149;164m' gold=$'\e[38;2;212;178;92m' dim=$'\e[38;2;108;112;134m'
-fg=$'\e[38;2;215;221;230m' sub=$'\e[38;2;154;159;170m' green=$'\e[38;2;158;209;166m'
-red=$'\e[38;2;232;125;125m' blue=$'\e[38;2;108;142;191m' purple=$'\e[38;2;194;130;206m'
-b=$'\e[1m' r=$'\e[0m' key=$'\e[1;38;2;208;149;164m'
+# Colours, as r;g;b. With varna (github.com/Theyashsawarkar/varna, a theme
+# engine) they're the current theme's; without it, sangam's own.
+_varna="${XDG_STATE_HOME:-$HOME/.local/state}/varna/fzf.sh"
+# shellcheck disable=SC1090
+[ -r "$_varna" ] && . "$_varna"
+RGB_HI=${VARNA_RGB_ACCENT2:-208;149;164} RGB_GOLD=${VARNA_RGB_MATCH:-212;178;92} RGB_DIM=${VARNA_RGB_MUTED:-108;112;134}
+RGB_FG=${VARNA_RGB_FG:-215;221;230} RGB_SUB=${VARNA_RGB_SUBTEXT0:-154;159;170} RGB_GREEN=${VARNA_RGB_OK:-158;209;166}
+RGB_RED=${VARNA_RGB_ERROR:-232;125;125} RGB_BLUE=${VARNA_RGB_BLUE:-108;142;191} RGB_PURPLE=${VARNA_RGB_MARK:-194;130;206}
+RGB_INK=${VARNA_RGB_INK:-11;14;20} RGB_LINE=${VARNA_RGB_LINE:-59;64;72} RGB_SEL=${VARNA_RGB_SURFACE0:-42;45;53}
+RGB_TEXT=${VARNA_RGB_TEXT:-255;255;255}
+fgc() { printf '\e[%s38;2;%sm' "${2:-}" "$1"; }
+hex() { local a b c; IFS=';' read -r a b c <<<"$1"; printf '#%02X%02X%02X' "$a" "$b" "$c"; }
+rose=$(fgc "$RGB_HI") gold=$(fgc "$RGB_GOLD") dim=$(fgc "$RGB_DIM") fg=$(fgc "$RGB_FG") sub=$(fgc "$RGB_SUB")
+green=$(fgc "$RGB_GREEN") red=$(fgc "$RGB_RED") blue=$(fgc "$RGB_BLUE") purple=$(fgc "$RGB_PURPLE")
+b=$'\e[1m' r=$'\e[0m' key=$(fgc "$RGB_HI" '1;')
+HI=$(hex "$RGB_HI") DIMH=$(hex "$RGB_DIM") LINEH=$(hex "$RGB_LINE") FGH=$(hex "$RGB_FG")
+FZF_COLORS=${VARNA_FZF_COLORS:-"bg:-1,bg+:$(hex "$RGB_SEL"),fg:$FGH,fg+:$(hex "$RGB_TEXT"),hl:$HI,hl+:$HI,border:$HI,label:$HI,prompt:$HI,pointer:$HI,info:$DIMH,query:$FGH,input-border:$HI,list-border:$LINEH,list-label:$HI,footer-border:$LINEH,footer-label:$DIMH,preview-border:$LINEH,preview-label:$DIMH"}
+FZF_COLORS+=",header:$DIMH,header-border:$LINEH,header-label:$DIMH"
 
 STATES=(open merged closed all)
 NORMAL_KEYS='j,k,g,G,h,l,J,K,1,2,3,4,f,F,u,s,S,R,E,m,a,r,c,x,o,d,y,b,q,/,?'
-VERSION=2.0.1
+VERSION=2.0.2
 CONFIG=${XDG_CONFIG_HOME:-$HOME/.config}/sangam/sections
 CROOT=${XDG_CACHE_HOME:-$HOME/.cache}/sangam
 # Sections from before the rename (tmux-gh-pr) carry over once.
@@ -249,10 +263,9 @@ list() {
 # ------------------------------------------------------------------ views
 cols() { echo "${FZF_PREVIEW_COLUMNS:-$(tput cols 2>/dev/null || echo 100)}"; }
 rule() { local w; w=$(( $(cols) - 2 )); printf '%s── %s %s%s\n' "$dim" "$1" "$(printf '─%.0s' $(seq 1 $(( w > ${#1} + 4 ? w - ${#1} - 4 : 1 ))))" "$r"; }
-# Capsule like the tmux status bar: badge <hex bg> <text>
+# Capsule like the tmux status bar: badge <r;g;b bg> <text>
 badge() {
-  local h=${1#\#} bg; bg="$((16#${h:0:2}));$((16#${h:2:2}));$((16#${h:4:2}))"
-  printf '\e[38;2;%sm\e[0m\e[48;2;%sm\e[38;2;11;14;20m\e[1m%s\e[0m\e[38;2;%sm\e[0m' "$bg" "$bg" "$2" "$bg"
+  printf '\e[38;2;%sm\e[0m\e[48;2;%sm\e[38;2;%sm\e[1m%s\e[0m\e[38;2;%sm\e[0m' "$1" "$1" "$RGB_INK" "$2" "$1"
 }
 # GitHub-style change bar: <added> <deleted> <width>: green/red share, gray rest
 bar() {
@@ -283,7 +296,7 @@ view_overview() {
   IFS=$'\x1f' read -r st title who upd opened head base fork < <(jq -r "$JQ_DEFS"'
     [(if .state == "OPEN" and .isDraft then "DRAFT" else .state end), .title, .author.login,
      ago(.updatedAt), ago(.createdAt), .headRefName, .baseRefName, .isCrossRepository] | map(tostring) | join("\u001f")' "$j")
-  local bc; case $st in OPEN) bc='#9ED1A6' ;; DRAFT) bc='#9A9FAA' ;; MERGED) bc='#C282CE' ;; *) bc='#E87D7D' ;; esac
+  local bc; case $st in OPEN) bc=$RGB_GREEN ;; DRAFT) bc=$RGB_SUB ;; MERGED) bc=$RGB_PURPLE ;; *) bc=$RGB_RED ;; esac
 
   # header: repo #n, then the title (wrapped by words)
   echo
@@ -321,11 +334,11 @@ view_overview() {
   else c="${green}✓ $pass passed$r"; [ "$fail" -gt 0 ] && c+="  ${red}✗ $fail failed$r"; [ "$pend" -gt 0 ] && c+="  ${gold}● $pend running$r"; fi
   printf "$row" "$dim" "󰄴" checks "$r" "$c" "$r"
   local rv
-  rv=$(jq -r '[(.latestReviews // [])[] | select(.state != "COMMENTED" and .state != "PENDING") |
-        (if .state == "APPROVED" then "\u001b[38;2;158;209;166m✔ \(.author.login)"
-         elif .state == "CHANGES_REQUESTED" then "\u001b[38;2;232;125;125m✎ \(.author.login)"
+  rv=$(jq -r --arg g "$RGB_GREEN" --arg rd "$RGB_RED" --arg d "$RGB_DIM" '[(.latestReviews // [])[] | select(.state != "COMMENTED" and .state != "PENDING") |
+        (if .state == "APPROVED" then "\u001b[38;2;\($g)m✔ \(.author.login)"
+         elif .state == "CHANGES_REQUESTED" then "\u001b[38;2;\($rd)m✎ \(.author.login)"
          else "\(.author.login) \(.state | ascii_downcase)" end)]
-       + [(.reviewRequests // [])[] | "\u001b[38;2;108;112;134m○ \(.login // .name // .slug)"] | join("\u001b[0m   ")' "$j")
+       + [(.reviewRequests // [])[] | "\u001b[38;2;\($d)m○ \(.login // .name // .slug)"] | join("\u001b[0m   ")' "$j")
   printf "$row" "$dim" "󰈈" reviews "$r" "${rv:-${dim}none yet}" "$r"
   local ad dl cf; read -r ad dl cf < <(jq -r '"\(.additions) \(.deletions) \(.changedFiles)"' "$j")
   printf "$row" "$dim" "" changes "$r" "$green+$ad $red−$dl$r ${dim}in$r $cf file$([ "$cf" = 1 ] || echo s)  $(bar "$ad" "$dl" 10)" "$r"
@@ -453,7 +466,7 @@ tabs() {
       f=$(listfile "$i"); c=$(jq length "$f" 2>/dev/null || echo "·"); ((${#c} < 2)) && c=" $c"
       name=$(secf "$i" 1); ((short)) && name=${name%% *}
       if [ "$i" = "$cur" ]; then
-        out+=$'\e[38;2;212;178;92m\e[0m\e[48;2;212;178;92m\e[38;2;11;14;20m\e[1m'"$name $c"$'\e[0m\e[38;2;212;178;92m\e[0m  '
+        out+="$(badge "$RGB_GOLD" "$name $c")  "
       else out+=" ${sub}$name ${dim}$c$r   "; fi
       plain=$(( plain + ${#name} + ${#c} + 5 ))
     done
@@ -479,7 +492,8 @@ strip_line() {
 # The frame is built first and written in one go over the old one, and
 # not at all if it's unchanged: clearing and redrawing made it flicker.
 strip() {
-  local line=$'\e[38;2;59;64;72m' sig old="" W frame shown="" bar
+  local line sig old="" W frame shown="" bar
+  line=$(fgc "$RGB_LINE")
   printf '\e[?25l'
   while [ -d "$STATE" ]; do
     W=$(tput cols)
@@ -533,7 +547,7 @@ pick() {  # pick <label> <options...>: a small fzf menu, prints the choice
   local label=$1; shift
   printf '%s\n' "$@" | fzf --ansi --layout reverse --no-info --no-separator --no-scrollbar --margin 18%,22% \
     --border rounded --border-label " $label " --border-label-pos 3 --pointer '▌' --prompt '  ' --gutter ' ' \
-    --color "bg:-1,bg+:#2A2D35,fg:#D7DDE6,fg+:#FFFFFF,hl:#D095A4,hl+:#D095A4,border:#D095A4,label:#D095A4,prompt:#D095A4,pointer:#D095A4"
+    --color "$FZF_COLORS"
 }
 
 ask_line() {  # ask_line <prompt> <hint> <prefill>
@@ -668,7 +682,7 @@ clip() {
 
 header() {
   clear
-  jq -r '"\u001b[1;38;2;212;178;92m#\(.number)\u001b[0m  \u001b[1m\(.title)\u001b[0m\n\u001b[38;2;108;112;134m\(.author.login) · \(.headRefName) → \(.baseRefName) · \(.state | ascii_downcase)\u001b[0m\n"' "$CACHE/$1.json"
+  jq -r --arg go "$RGB_GOLD" --arg d "$RGB_DIM" '"\u001b[1;38;2;\($go)m#\(.number)\u001b[0m  \u001b[1m\(.title)\u001b[0m\n\u001b[38;2;\($d)m\(.author.login) · \(.headRefName) → \(.baseRefName) · \(.state | ascii_downcase)\u001b[0m\n"' "$CACHE/$1.json"
 }
 
 # Message in $EDITOR. Prints the file's text above the marker; empty = cancel.
@@ -1046,10 +1060,7 @@ run_main() {
     --bind "/:show-input+unbind($NORMAL_KEYS)" \
     --bind "esc:transform:[ \"\$FZF_INPUT_STATE\" = enabled ] && echo '$normal' || echo abort" \
     --bind "enter:transform:[ \"\$FZF_INPUT_STATE\" = enabled ] && echo '$normal' || echo \"execute($self --full {1})\"" \
-    --color "bg:-1,bg+:#2A2D35,fg:#D7DDE6,fg+:#FFFFFF,hl:#D095A4,hl+:#D095A4" \
-    --color "border:#D095A4,label:#D095A4,prompt:#D095A4,pointer:#D095A4,info:#6C7086,query:#D7DDE6" \
-    --color "input-border:#D095A4,list-border:#3B4048,list-label:#D095A4,footer-border:#3B4048,footer-label:#6C7086" \
-    --color "preview-border:#3B4048,preview-label:#6C7086,header:#6C7086,header-border:#3B4048,header-label:#6C7086" >/dev/null
+    --color "$FZF_COLORS" >/dev/null
 }
 
 # ------------------------------------------------------------------ main
@@ -1065,7 +1076,7 @@ case $1 in
   --strip) strip; exit ;;
   --main) run_main; exit ;;
   --show-keys)
-    tmux display-popup -E -w 116 -h 15 -b rounded -S "fg=#D095A4" -T "#[fg=#D095A4] keys #[fg=#6C7086]· any key closes " \
+    tmux display-popup -E -w 116 -h 15 -b rounded -S "fg=$HI" -T "#[fg=$HI] keys #[fg=$DIMH]· any key closes " \
       "STATE='$STATE' '$self' --keys"; exit ;;
   --toggle-all)
     if [ "$(state)" = all ]; then echo open >"$STATE/state"; else echo all >"$STATE/state"; fi
