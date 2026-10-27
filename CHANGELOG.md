@@ -2,6 +2,10 @@
 
 Newest first.
 
+## v2.1.1 -- 2026-10-27
+
+- ShellCheck clean again (the merge tool builds its gh flags as an array).
+
 ## v2.1.0 -- 2026-10-27
 
 - **For AI agents**: `sangam mcp`, an MCP server, and `sangam call <tool>

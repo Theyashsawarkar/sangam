@@ -85,7 +85,7 @@ FZF_COLORS+=",header:$DIMH,header-border:$LINEH,header-label:$DIMH"
 
 STATES=(open merged closed all)
 NORMAL_KEYS='j,k,g,G,h,l,J,K,1,2,3,4,f,F,u,s,S,R,E,m,a,r,c,x,o,d,y,b,q,/,?'
-VERSION=2.1.0
+VERSION=2.1.1
 CONFIG=${XDG_CONFIG_HOME:-$HOME/.config}/sangam/sections
 CROOT=${XDG_CACHE_HOME:-$HOME/.cache}/sangam
 # Sections from before the rename (tmux-gh-pr) carry over once.
@@ -1417,7 +1417,7 @@ tool_pr_review() {
   use_account "$(arg account)" || return 1
   asked "${ev/_/ } on $REPO#$N" "$(pr_title)"$'\n'"as $ACCT" "$body" || return 1
   [ "$ev" = approve ] || [ -n "$ASKED_TEXT" ] || { echo "Nothing done: the user emptied the review."; return 1; }
-  out=$(timeout 60 gh pr review "$N" -R "$REPO" $flag ${ASKED_TEXT:+--body-file -} <<<"$ASKED_TEXT" 2>&1) || { echo "gh pr review failed: $out"; return 1; }
+  out=$(timeout 60 gh pr review "$N" -R "$REPO" "$flag" ${ASKED_TEXT:+--body-file -} <<<"$ASKED_TEXT" 2>&1) || { echo "gh pr review failed: $out"; return 1; }
   changed
   echo "Review submitted as $ACCT (${ev/_/ }) on $REPO#$N."
   [ "$ASKED_TEXT" = "$body" ] || printf '\nThe user edited it first; what was submitted:\n%s\n' "$ASKED_TEXT"
@@ -1436,8 +1436,10 @@ tool_pr_merge() {
     "$info"$'\n'"as $ACCT$([ "$del" = true ] && echo ", then delete the branch")" || return 1
   # From /: with --delete-branch, gh would also switch and delete branches
   # of a local clone it runs in.
-  out=$(cd / && timeout 120 gh pr merge "$N" -R "$REPO" "--$how" ${auto:+$([ "$auto" = true ] && echo --auto)} \
-        $([ "$del" = true ] && echo --delete-branch) </dev/null 2>&1) || { echo "gh pr merge failed: $out"; return 1; }
+  local flags=("--$how")
+  [ "$auto" = true ] && flags+=(--auto)
+  [ "$del" = true ] && flags+=(--delete-branch)
+  out=$(cd / && timeout 120 gh pr merge "$N" -R "$REPO" "${flags[@]}" </dev/null 2>&1) || { echo "gh pr merge failed: $out"; return 1; }
   changed
   if [ "$auto" = true ]; then echo "Auto-merge ($how) is on for $REPO#$N: it merges once everything passes."
   else echo "Merged $REPO#$N ($how) as $ACCT.${out:+ $out}"; fi
