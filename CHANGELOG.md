@@ -2,6 +2,26 @@
 
 Newest first.
 
+## v2.1.0 -- 2026-10-27
+
+- **For AI agents**: `sangam mcp`, an MCP server, and `sangam call <tool>
+  [json]`, the same tools as commands. Agents can list and search PRs (a
+  query, one of your sections, or all of them), read a PR (checks, reviews,
+  files, comments, inline review comments) and its diff, and see the counts
+  (`pr_counts`, what a status bar shows). Commenting, reviewing and merging
+  wait for your approval in a tmux popup (`y` approve, `n` decline, `e`
+  edit the text first), or a desktop notification without tmux; no answer in
+  10 minutes is a no. Other people's text reaches the agent inside
+  `<untrusted>` blocks.
+- Agents use the account you picked with `u` (the one sangam opens on),
+  else gh's active one.
+- **Tells a status bar when PRs change**: after a merge, review, comment,
+  close or draft toggle (yours or an agent's) and whenever it reloads lists,
+  sangam writes the time to `~/.cache/sangam/changed`, so a bar showing PR
+  counts can recount at once instead of on its next poll.
+- Temp files of fetches cut short (closing the popup mid-fetch) no longer
+  pile up in the cache: sangam clears ones older than 10 minutes on start.
+
 ## v2.0.2 -- 2026-10-21
 
 - **Follows your theme**: with [varna](https://github.com/Theyashsawarkar/varna)

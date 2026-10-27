@@ -51,6 +51,7 @@ and needs no token, server or config to start.
   - [Merging](#merging)
 - [Keys](#keys)
 - [Command line](#command-line)
+- [For AI agents](#for-ai-agents)
 - [Using it inside tmux](#using-it-inside-tmux)
 - [Colours](#colours)
 - [Files and environment](#files-and-environment)
@@ -520,12 +521,73 @@ The merge panel's own keys are listed under [Merging](#merging).
 sangam               open it in this folder (any terminal, in tmux or not)
 sangam -C <dir>      open it as if started in <dir>
 sangam doctor        check the dependencies and the GitHub sign-in
+sangam mcp           an MCP server for AI agents (see For AI agents)
+sangam call <tool> [json]   one agent tool, for agents without MCP
 sangam --version     print the version
 sangam --help        show the help
 ```
 
 `sangam doctor` exits non-zero when something required is missing, so it
 also works in scripts.
+
+## For AI agents
+
+An AI agent (Claude Code, Codex, Aider, anything that speaks MCP or runs a
+command) can use your pull requests through sangam: list and search them,
+read one with its checks, reviews and comments, read its diff, and comment,
+review or merge. **Reading is free; anything that writes to GitHub waits for
+your yes.**
+
+Add it to Claude Code (any MCP client works the same way; the server is
+`sangam mcp`, on stdio):
+
+```
+claude mcp add --scope user sangam -- sangam mcp
+```
+
+An agent without MCP runs the same tools as commands:
+
+```
+sangam call                                  list the tools
+sangam call pr_list '{"section":"Review requested"}'
+sangam call pr_view '{"pr":"owner/repo#12"}'
+```
+
+| Tool | What it does |
+|---|---|
+| `pr_accounts` | the signed-in gh accounts, gh's active one, and the one picked in sangam |
+| `pr_counts` | how many PRs wait for your review and how many of yours are open (per account) |
+| `pr_list` | a GitHub search (`query`), one of your [sections](#sections) (`section`), or every section; `state`, `account`, `limit` |
+| `pr_view` | one PR: state, branches, mergeability, reviews, requested reviewers, checks (failing ones with links), files, description, comments, inline review comments |
+| `pr_diff` | its diff, or one `file`'s; cut at `max_lines` (2000) |
+| `pr_comment` | post a comment: **asks you first** |
+| `pr_review` | approve, request changes or comment: **asks you first** |
+| `pr_merge` | merge (squash, merge or rebase) or turn on auto-merge, optionally deleting the branch: **asks you first** |
+
+A PR is `owner/repo#number` or its URL. Without `account`, the tools use
+the account you picked in sangam with `u` (empty there: all accounts), else
+gh's active one; for one PR, the first of those that can see it.
+
+**Approving.** A write opens a popup on your tmux client (the agent's own
+pane when it runs in tmux, else the client you used last) showing the PR,
+the account it acts as and the text it will post; for a merge, the PR's
+checks, review state and mergeability:
+
+| Key | |
+|---|---|
+| `y` | approve: sangam does it and tells the agent |
+| `n` / `Esc` | decline: nothing happens, the agent is told you declined |
+| `e` | edit the text in your editor first; the agent is told what was posted |
+
+No answer in 10 minutes is a no. Without tmux, a desktop notification with
+Approve / Decline buttons asks instead (no editing); with neither, writes
+are refused. Titles, descriptions, comments and diffs are other people's
+words, so the tools hand them to the agent inside `<untrusted>` blocks and
+the server tells it to treat them as data.
+
+The popup is a consent step, not a sandbox: an agent that can run `gh`
+itself can still do so. It's there so an agent that uses sangam never acts
+on GitHub without you seeing it first.
 
 ## Using it inside tmux
 
@@ -584,6 +646,8 @@ recolours the next sangam you open.
 |---|---|
 | `~/.config/sangam/sections` | your sections ([format](#sections)) |
 | `~/.cache/sangam/` | cached lists and PR details (safe to delete), the last section and account |
+| `~/.cache/sangam/changed` | the time PRs last changed through sangam (or were reloaded): a status bar can watch it to recount |
+| `$XDG_RUNTIME_DIR/sangam-ask.XXXXXX/` | an agent's request while it waits for your approval, removed after |
 | `$XDG_RUNTIME_DIR/sangam.XXXXXX/` | one run's state and its private tmux socket, removed on quit |
 
 sangam respects `XDG_CONFIG_HOME` and `XDG_CACHE_HOME`. Other variables:

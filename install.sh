@@ -63,3 +63,4 @@ esac
 
 say "Checking the dependencies (sangam doctor):"
 "$DIR/bin/sangam" doctor || say "Fix what's marked ✗ above, then run: sangam"
+say "For AI agents (MCP): claude mcp add --scope user sangam -- sangam mcp"
