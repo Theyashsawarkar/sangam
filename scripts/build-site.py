@@ -25,8 +25,11 @@ PAGES = "https://theyashsawarkar.github.io"
 FAMILY = [
     ("Desktop", [("vayu", "वायु", "the keyboard-driven Wayland desktop", "https://theyashsawarkar.github.io/vayu/")]),
     ("Apps", [("kosha", "कोश", "package manager"), ("nada", "नाद", "music player"),
-              ("sangam", "संगम", "pull requests in the terminal"), ("anumati", "अनुमति", "root commands for AI agents"),
-              ("vesha", "वेष", "Claude Code accounts"), ("varna", "वर्ण", "theme engine"),
+              ("drishya", "दृश्य", "video player"), ("sangam", "संगम", "pull requests in the terminal"),
+              ("sandesh", "संदेश", "mail and chat in the terminal"), ("pattan", "पत्तन", "ports and tunnels"),
+              ("nauka", "नौका", "Docker in the terminal"), ("anumati", "अनुमति", "commands for AI agents, approved"),
+              ("pramana", "प्रमाण", "password prompts"), ("vesha", "वेष", "Claude Code accounts"),
+              ("ekatva", "एकत्व", "phone and laptop, linked"), ("varna", "वर्ण", "theme engine"),
               ("vinyasa", "विन्यास", "settings")]),
     ("Vyom", [("vyom", "व्योम", "panels runtime")]),
     ("Vyom tools", [("dvara", "द्वार", "apps"), ("ganit", "गणित", "calculator"), ("smriti", "स्मृति", "clipboard"),
