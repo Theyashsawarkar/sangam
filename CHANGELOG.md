@@ -2,6 +2,11 @@
 
 Newest first.
 
+## v2.3.1 -- 2026-11-03
+
+- Fixed: an agent's `sangam mcp` started before 2.3 and still running opened the
+  new popup with almost nothing on it. It now shows everything the request has.
+
 ## v2.3.0 -- 2026-11-02
 
 - **A new approval popup**: one sentence says who wants what, then what you

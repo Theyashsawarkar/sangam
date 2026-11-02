@@ -89,6 +89,24 @@ t send-keys -t o u; sleep .6
 s=$(screen); grep -qF "hello there" <<<"$s" || fail "u didn't undo"
 grep -qF "edited by you" <<<"$s" && fail "u left the label"
 
+# A request from an older sangam still running shows everything it has.
+old=$tmp/old; mkdir -p "$old"; printf 'Claude Code' >"$old/who"; printf 'merge (squash) acme/shop#7' >"$old/what"
+printf 'Fix the thing\nas sam\n' >"$old/details"; printf 'lands on main' >"$old/risk"; printf 'commits that land:\n  a1f3c09 Fix\n' >"$old/extra"; : >"$old/why"; date +%s >"$old/since"
+stop; t new -d -s o -x 150 -y 40 "env -u TMUX SANGAM_ASK='$old' bash '$here/bin/sangam' --approve-ui 2>'$tmp/old-err'; sleep 30"; sleep 1.2
+s=$(screen)
+for want in "Claude Code wants to merge (squash) acme/shop#7" "lands on main" "Fix the thing" "as sam" "a1f3c09" "Approve" "Decline"; do
+  grep -qF "$want" <<<"$s" || fail "old request: missing $want"
+done
+[ ! -s "$tmp/old-err" ] || fail "old request: errors: $(cat "$tmp/old-err")"
+stop
+# ... and with text, which stays the text you can edit
+printf 'hello team' >"$old/text"; rm -f "$old/kind"; date +%s >"$old/since"
+t new -d -s o -x 150 -y 40 "env -u TMUX SANGAM_ASK='$old' bash '$here/bin/sangam' --approve-ui; sleep 30"; sleep 1.2
+s=$(screen)
+for want in "Fix the thing" "hello team" "Edit"; do grep -qF "$want" <<<"$s" || fail "old request with text: missing $want"; done
+grep -qF "edited by you" <<<"$s" && fail "old request with text: shown as edited"
+stop
+
 # The tools build the request from what gh says. Fake gh, tmux and
 # notify-send: nothing reaches GitHub or your tmux.
 bin=$tmp/bin; mkdir -p "$bin"

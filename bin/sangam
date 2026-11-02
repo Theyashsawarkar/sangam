@@ -85,7 +85,7 @@ FZF_COLORS+=",header:$DIMH,header-border:$LINEH,header-label:$DIMH"
 
 STATES=(open merged closed all)
 NORMAL_KEYS='j,k,g,G,h,l,J,K,1,2,3,4,f,F,u,s,S,R,E,m,a,r,c,x,o,d,y,b,q,/,?'
-VERSION=2.3.0
+VERSION=2.3.1
 CONFIG=${XDG_CONFIG_HOME:-$HOME/.config}/sangam/sections
 CROOT=${XDG_CACHE_HOME:-$HOME/.cache}/sangam
 # Sections from before the rename (tmux-gh-pr) carry over once.
@@ -1527,11 +1527,23 @@ approve_frame() {
 }
 
 approve_ui() {
-  local d=$SANGAM_ASK k left shown="" since redraw=1 ed
+  local d=$SANGAM_ASK k left shown="" since redraw=1 ed line f
   [ -d "$d" ] || exit 1
   trap '[ -s "$d/answer" ] || echo no >"$d/answer"; printf "\e[?25h\e[?1049l"' EXIT
   trap 'redraw=1' WINCH
   since=$(cat "$d/since" 2>/dev/null || date +%s)
+  # A request from a sangam started before 2.3 (an agent's server still
+  # running): it has what, details, risk and extra. Never ask with less shown.
+  if [ ! -e "$d/kind" ]; then
+    printf 'request' >"$d/kind"; cp "$d/what" "$d/say"; for f in ref target after facts url log; do : >"$d/$f"; done
+    printf 'care' >"$d/tone"; printf 'Approve' >"$d/action"; printf 'what it asks' >"$d/title"
+    if [ -s "$d/risk" ]; then printf 'warn\t%s\n' "$(cat "$d/risk")" >"$d/chips"; else : >"$d/chips"; fi
+    { cat "$d/details"; [ -s "$d/extra" ] && { echo; cat "$d/extra"; }; } >"$d/frame"
+    if [ -f "$d/text" ]; then
+      cp "$d/text" "$d/orig"
+      while IFS= read -r line; do printf 'H\t%s\n' "$line"; done <"$d/frame" >"$d/facts"
+    fi
+  fi
   SCROLL=0
   printf '\e[?1049h\e[?25l'
   # A popup can open while you're typing elsewhere: what you were typing
