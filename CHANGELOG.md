@@ -2,6 +2,19 @@
 
 Newest first.
 
+## v2.2.0 -- 2026-11-02
+
+- **A clearer approval popup**: who asks (the agent's name from MCP), what
+  it wants as one sentence, what's at stake, the agent's reason (a new
+  optional `why` on `pr_comment`, `pr_review` and `pr_merge`), and for a
+  merge the commits that land and what follows. A countdown shows when no
+  answer becomes a no.
+- **The merge screen** says first whether the PR is ready to merge, and
+  shows what follows a merge (branch deletion, stacked PRs moving to the
+  base).
+- Fixed: an agent's merge with the merge-commit method was shown as
+  "merge-merge".
+
 ## v2.1.1 -- 2026-10-27
 
 - ShellCheck clean again (the merge tool builds its gh flags as an array).
