@@ -569,12 +569,12 @@ the account you picked in sangam with `u` (empty there: all accounts), else
 gh's active one; for one PR, the first of those that can see it.
 
 **Approving.** A write opens a popup on your tmux client (the agent's own
-pane when it runs in tmux, else the client you used last). It reads like a
-sentence, "Claude Code wants to merge (squash) owner/repo#12", with what's at
-stake beside it (public, or "lands on main · undo is a revert"), the reason
-the agent gave in its own `why`, the PR, the account it acts as and the text
-it will post; for a merge also the checks, review state, the commits that
-land and what follows (the branch deleted, stacked PRs moving to the base).
+pane when it runs in tmux, else the client you used last). It says in one
+sentence who wants what ("Claude Code wants to squash and merge into main"),
+then what you asked, then labels for what's at stake ("lands on main", "not
+ready: 1 check failed", "public on the PR"). The details sit beside the exact
+text or, for a merge, what's ready, the commits that land and what follows.
+The border turns red for a merge. It stays perfectly still while it waits.
 It counts down to the 10 minutes after which no answer is a no:
 
 | Key | |
@@ -582,6 +582,13 @@ It counts down to the 10 minutes after which no answer is a no:
 | `y` | approve: sangam does it and tells the agent |
 | `n` / `Esc` | decline: nothing happens, the agent is told you declined |
 | `e` | edit the text in your editor first; the agent is told what was posted |
+| `u` | undo your edit |
+| `d` | view the PR's diff |
+| `l` | open a failed check's log in the browser |
+| `b` | open the PR on GitHub in the browser |
+| `j` / `k` | scroll the text |
+
+`Enter` never answers, and a key pressed as the popup opens can't either.
 
 No answer in 10 minutes is a no. Without tmux, a desktop notification with
 Approve / Decline buttons asks instead (no editing); with neither, writes

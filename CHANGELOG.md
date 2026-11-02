@@ -2,6 +2,22 @@
 
 Newest first.
 
+## v2.3.0 -- 2026-11-02
+
+- **A new approval popup**: one sentence says who wants what, then what you
+  asked, then labels for what's at stake. The details sit beside the exact
+  text, or for a merge what's ready and what isn't, the commits that land and
+  what follows. The action says what it does ("Merge into main"). The border
+  turns red for a merge, and it says plainly when a PR isn't ready.
+- **Fixed: the popup flickered.** It cleared and redrew everything each second
+  for the countdown. Now it draws once and rewrites only the countdown; a test
+  fails if it ever clears the screen while waiting.
+- New keys: `d` views the diff, `l` opens a failed check's log, `b` opens the
+  PR, `u` undoes your edit, `j`/`k` scroll. Your edit is marked.
+- A key pressed as the popup opens (you were typing elsewhere) can't answer it.
+- `make check` runs the popup on a throwaway tmux server (`tests/approve.sh`),
+  with a fake gh: nothing reaches GitHub.
+
 ## v2.2.0 -- 2026-11-02
 
 - **A clearer approval popup**: who asks (the agent's name from MCP), what
