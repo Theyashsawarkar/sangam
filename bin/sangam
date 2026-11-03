@@ -85,7 +85,7 @@ FZF_COLORS+=",header:$DIMH,header-border:$LINEH,header-label:$DIMH"
 
 STATES=(open merged closed all)
 NORMAL_KEYS='j,k,g,G,h,l,J,K,1,2,3,4,f,F,u,s,S,R,E,m,a,r,c,x,o,d,y,b,q,/,?'
-VERSION=2.4.0
+VERSION=2.4.2
 CONFIG=${XDG_CONFIG_HOME:-$HOME/.config}/sangam/sections
 CROOT=${XDG_CACHE_HOME:-$HOME/.cache}/sangam
 # Sections from before the rename (tmux-gh-pr) carry over once.

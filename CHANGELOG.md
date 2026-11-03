@@ -2,6 +2,10 @@
 
 Newest first.
 
+## v2.4.2 -- 2026-11-04
+
+- `sangam --version` says the right version: v2.4.1 went out still saying 2.4.0.
+
 ## v2.4.1 -- 2026-11-03
 
 - The keys' wording matches what the keybinding search accepts.
