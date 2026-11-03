@@ -85,7 +85,7 @@ FZF_COLORS+=",header:$DIMH,header-border:$LINEH,header-label:$DIMH"
 
 STATES=(open merged closed all)
 NORMAL_KEYS='j,k,g,G,h,l,J,K,1,2,3,4,f,F,u,s,S,R,E,m,a,r,c,x,o,d,y,b,q,/,?'
-VERSION=2.3.1
+VERSION=2.3.2
 CONFIG=${XDG_CONFIG_HOME:-$HOME/.config}/sangam/sections
 CROOT=${XDG_CACHE_HOME:-$HOME/.cache}/sangam
 # Sections from before the rename (tmux-gh-pr) carry over once.
@@ -1391,6 +1391,9 @@ ask_approval() {
 # countdown is rewritten, in place: redrawing it all is what used to flicker.
 at() { printf '\e[%d;%dH' "$1" "$2"; }
 
+# cut_to <text> <width>: the text, ending in … when it's longer
+cut_to() { if ((${#1} > $2)); then printf '%s…' "${1:0:$(($2 > 1 ? $2 - 1 : 0))}"; else printf '%s' "$1"; fi; }
+
 # chip <warn|bad|edit|plain> <text>
 chip() {
   case $1 in
@@ -1435,7 +1438,7 @@ approve_draw() {
   # the top: what kind, which PR, and (top right) the time left
   row=2
   at "$row" 4; printf '\e[48;2;%sm\e[38;2;%sm\e[1m %s \e[0m  %s%s%s' "$RGB_PURPLE" "$RGB_INK" "$(cat "$d/kind")" "$dim" "$(cat "$d/ref")" "$r"
-  CLOCK_ROW=$row CLOCK_COL=$((W - 26))
+  CLOCK_ROW=$row CLOCK_COL=$((W - 29))
   # one sentence: who wants what
   row=$((row + 2))
   local say target after plain
@@ -1452,7 +1455,7 @@ approve_draw() {
   local x=4 kind text
   row=$((row + 1))
   { [ -f "$d/text" ] && ! cmp -s "$d/text" "$d/orig" && printf 'edit\tedited by you: y posts your version\n'; cat "$d/chips"; } >"$d/.chips"
-  while IFS=$'\t' read -r kind text; do
+  while IFS=$'\t' read -r kind text || [ -n "$kind" ]; do
     [ -n "$text" ] || continue
     if ((x + ${#text} + 3 > W - 2)); then x=4 row=$((row + 1)); fi
     at "$row" "$x"; chip "$kind" "$text"; x=$((x + ${#text} + 3))
@@ -1478,17 +1481,17 @@ approve_draw() {
   factw=$((two ? (cw / 3 + 4 > 44 ? 44 : cw / 3 + 4) : cw))
   n=$top
   local stop=$bot; ((two)) || stop=$((bot - 5))
-  while IFS=$'\t' read -r c lab val; do
+  while IFS=$'\t' read -r c lab val || [ -n "$c" ]; do
     ((n > stop)) && break
     at "$n" 4
     case $c in
       H) printf '%s%s%s' "$dim" "${lab:0:factw}" "$r" ;;
       F) case $lab in
-           ✓) printf '%s\e[1m%s%s %s' "$green" "$lab" "$r" "${val:0:$((factw - 2))}" ;;
-           ✗) printf '%s\e[1m%s%s %s' "$red" "$lab" "$r" "${val:0:$((factw - 2))}" ;;
-           ○) printf '%s\e[1m%s%s %s' "$gold" "$lab" "$r" "${val:0:$((factw - 2))}" ;;
-           ·) printf '%s%s %s%s' "$dim" "$lab" "${val:0:$((factw - 2))}" "$r" ;;
-           *) printf '%s%-8s%s %s' "$dim" "$lab" "$r" "${val:0:$((factw - 9))}" ;;
+           ✓) printf '%s\e[1m%s%s %s' "$green" "$lab" "$r" "$(cut_to "$val" $((factw - 2)))" ;;
+           ✗) printf '%s\e[1m%s%s %s' "$red" "$lab" "$r" "$(cut_to "$val" $((factw - 2)))" ;;
+           ○) printf '%s\e[1m%s%s %s' "$gold" "$lab" "$r" "$(cut_to "$val" $((factw - 2)))" ;;
+           ·) printf '%s%s %s%s' "$dim" "$lab" "$(cut_to "$val" $((factw - 2)))" "$r" ;;
+           *) printf '%s%-8s%s %s' "$dim" "$lab" "$r" "$(cut_to "$val" $((factw - 9)))" ;;
          esac ;;
     esac
     n=$((n + 1))
@@ -1526,24 +1529,80 @@ approve_frame() {
   fi
 }
 
+# upgrade_request <dir>: a request from a sangam before 2.3 (an agent's MCP
+# server started before the update keeps its old code) has only what, details
+# and maybe who, why, risk, extra. Read them into the fields the popup draws,
+# so it shows the same screen: never ask with less shown.
+upgrade_request() {
+  local d=$1 what ref="" kind=Request say tone=care target="" after="" action=Approve title chips="" facts="" frame=""
+  local l title_line="" branch="" ready="" as="" del="" mergeable="" review="" checks="" base="" head=""
+  what=$(cat "$d/what" 2>/dev/null)
+  [[ $what =~ ([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]+) ]] && ref=${BASH_REMATCH[1]}
+  { read -r title_line; while IFS= read -r l; do
+      case $l in
+        *' → '*) branch=$l ;;
+        mergeable:*) ready=$l ;;
+        'as '*) as=${l#as }; [[ $as == *', then delete the branch' ]] && { del=1; as=${as%, then delete the branch}; } ;;
+      esac
+    done; } <"$d/details"
+  if [ -n "$branch" ]; then head=${branch%% → *} base=${branch#* → } base=${base%% ·*}; fi
+  if [ -n "$ready" ]; then
+    mergeable=$(sed -n 's/^mergeable: \([a-z_]*\).*/\1/p' <<<"$ready")
+    review=$(sed -n 's/.*review: \([a-z_]*\).*/\1/p' <<<"$ready")
+    checks=$(sed -n 's/.*checks: \([a-z]*\).*/\1/p' <<<"$ready")
+  fi
+  case $what in
+    *auto-merge*) kind=Auto-merge tone=danger say="merge into" target=${base:-its base} after=" by itself, once it's ready" action="Turn on auto-merge" ;;
+    *merge*)
+      kind=Merge tone=danger target=${base:-its base} action="Merge into ${base:-its base}"
+      case $what in *squash*) say="squash and merge into" ;; *rebase*) say="rebase and merge into" ;; *) say="merge into" ;; esac ;;
+    'comment on'*) kind=Comment say="comment on" target=$ref action="Post the comment" ;;
+    'request changes'*) kind=Review say="request changes on" target=$ref action="Submit the review" ;;
+    approve*) kind=Review say="approve" target=$ref action="Approve the PR" ;;
+    *) say=${what% "$ref"}; target=$ref ;;
+  esac
+  title=${title_line:-the request}
+  # readiness, as the new popup shows it
+  if [ -n "$ready" ]; then
+    local nr=0 rows=""
+    case $checks in pass) rows+=$'F\t✓\tChecks: passed\n' ;; fail) rows+=$'F\t✗\tChecks: failed\n'; nr=1 ;; pending) rows+=$'F\t○\tChecks: running\n'; nr=1 ;; *) rows+=$'F\t·\tChecks: none\n' ;; esac
+    case $review in approved) rows+=$'F\t✓\tReview: approved\n' ;; changes_requested) rows+=$'F\t✗\tReview: changes requested\n'; nr=1 ;; review_required) rows+=$'F\t○\tReview: needs an approval\n'; nr=1 ;; *) rows+=$'F\t·\tReview: none required\n' ;; esac
+    case $mergeable in mergeable) rows+=$'F\t✓\tNo conflicts\n' ;; conflicting) rows+=$'F\t✗\tHas conflicts\n'; nr=1 ;; *) rows+=$'F\t○\tChecking for conflicts\n'; nr=1 ;; esac
+    facts=$(printf 'H\t%s\n%s' "$( ((nr)) && echo "Not ready yet" || echo "Ready to merge")" "$rows")
+    ((nr)) && chips+=$'bad\tnot ready\n'
+  fi
+  [ "$tone" = danger ] && chips+="bad"$'\t'"lands on ${base:-its base}"$'\n'
+  [ "$kind" = Auto-merge ] && chips+=$'warn\tmerges later, without asking again\n'
+  [ "$tone" = danger ] && chips+=$'plain\tundo is a revert\n'
+  [ -n "$del" ] && chips+=$'plain\tdeletes the branch\n'
+  case $kind in Comment) chips+=$'warn\tpublic on the PR\nplain\tnotifies the people on it\n' ;;
+    Review) [ "$say" = "request changes on" ] && chips+=$'warn\tblocks the merge until resolved\n'; chips+=$'plain\tpublic on the PR\n' ;; esac
+  [ -s "$d/risk" ] && [ -z "$chips" ] && chips="warn"$'\t'"$(cat "$d/risk")"$'\n'
+  [ -n "$facts" ] && facts+=$'\nH\t \n'
+  facts+=$'H\t'"$([ -n "$branch" ] && echo "The merge" || echo "The pull request")"$'\n'
+  [ -n "$ref" ] && facts+="F"$'\t'"PR"$'\t'"$ref"$'\n'
+  [ -f "$d/text" ] && [ -n "$title_line" ] && facts+="F"$'\t'"Title"$'\t'"$title_line"$'\n'
+  [ -n "$head" ] && facts+="F"$'\t'"From"$'\t'"$head"$'\n'"F"$'\t'"Into"$'\t'"$base"$'\n'
+  [ -n "$as" ] && facts+="F"$'\t'"As"$'\t'"$as"$'\n'
+  frame=$(if [ -s "$d/extra" ]; then sed 's/^commits that land:/Commits that land/; s/^}*after merging: /\nWhat happens next\n  /' "$d/extra"
+    elif [ -n "$base" ]; then printf 'What happens next\n  %s gets it\n' "$base"; [ -n "$del" ] && printf '  %s is deleted\n' "$head"
+    else echo "$title"; fi)
+  printf '%s' "$kind" >"$d/kind"; printf '%s' "$ref" >"$d/ref"; printf '%s' "$tone" >"$d/tone"; printf '%s' "$say" >"$d/say"
+  printf '%s' "$target" >"$d/target"; printf '%s' "$after" >"$d/after"; printf '%s' "$action" >"$d/action"
+  printf '%s' "$([ -f "$d/text" ] && echo "the text, as it will show" || echo "$title")" >"$d/title"
+  printf '%s' "$chips" >"$d/chips"; printf '%s' "$facts" >"$d/facts"; printf '%s\n' "$frame" >"$d/frame"
+  [ -s "$d/who" ] || printf 'An agent' >"$d/who"; [ -e "$d/why" ] || : >"$d/why"
+  : >"$d/url"; : >"$d/log"; [ -f "$d/text" ] && cp "$d/text" "$d/orig"
+  [ -e "$d/since" ] || date +%s >"$d/since"
+}
+
 approve_ui() {
   local d=$SANGAM_ASK k left shown="" since redraw=1 ed line f
   [ -d "$d" ] || exit 1
   trap '[ -s "$d/answer" ] || echo no >"$d/answer"; printf "\e[?25h\e[?1049l"' EXIT
   trap 'redraw=1' WINCH
   since=$(cat "$d/since" 2>/dev/null || date +%s)
-  # A request from a sangam started before 2.3 (an agent's server still
-  # running): it has what, details, risk and extra. Never ask with less shown.
-  if [ ! -e "$d/kind" ]; then
-    printf 'request' >"$d/kind"; cp "$d/what" "$d/say"; for f in ref target after facts url log; do : >"$d/$f"; done
-    printf 'care' >"$d/tone"; printf 'Approve' >"$d/action"; printf 'what it asks' >"$d/title"
-    if [ -s "$d/risk" ]; then printf 'warn\t%s\n' "$(cat "$d/risk")" >"$d/chips"; else : >"$d/chips"; fi
-    { cat "$d/details"; [ -s "$d/extra" ] && { echo; cat "$d/extra"; }; } >"$d/frame"
-    if [ -f "$d/text" ]; then
-      cp "$d/text" "$d/orig"
-      while IFS= read -r line; do printf 'H\t%s\n' "$line"; done <"$d/frame" >"$d/facts"
-    fi
-  fi
+  [ -e "$d/kind" ] || upgrade_request "$d"
   SCROLL=0
   printf '\e[?1049h\e[?25l'
   # A popup can open while you're typing elsewhere: what you were typing
@@ -1555,7 +1614,7 @@ approve_ui() {
     if ((redraw)); then redraw=0 shown=""; approve_draw "$d"; fi
     if [ "$left" != "$shown" ]; then
       shown=$left
-      at "$CLOCK_ROW" "$CLOCK_COL"; printf '%sno answer in %d:%02d is a no%s' "$dim" $((left / 60)) $((left % 60)) "$r"
+      at "$CLOCK_ROW" "$CLOCK_COL"; printf '%s%26s%s' "$dim" "$(printf 'no answer in %d:%02d is a no' $((left / 60)) $((left % 60)))" "$r"
     fi
     k=""; IFS= read -rsn1 -t 1 k || continue
     case $k in
@@ -1633,8 +1692,8 @@ tool_pr_review() {
   local verb say chips action
   case $ev in
     approve) verb="approve $REPO#$N" say="approve" action="Approve the PR" chips=$'warn\tcounts toward merging\nplain\tpublic on the PR' ;;
-    request_changes) verb="request changes on $REPO#$N" say="request changes" action="Submit the review" chips=$'warn\tblocks the merge until resolved\nplain\tpublic on the PR' ;;
-    *) verb="review $REPO#$N" say="review" action="Submit the review" chips=$'plain\tpublic on the PR\nplain\tnotifies the people on it' ;;
+    request_changes) verb="request changes on $REPO#$N" say="request changes on" action="Submit the review" chips=$'warn\tblocks the merge until resolved\nplain\tpublic on the PR' ;;
+    *) verb="review $REPO#$N" say="comment in a review on" action="Submit the review" chips=$'plain\tpublic on the PR\nplain\tnotifies the people on it' ;;
   esac
   pr_facts
   ASK_WHY=$(arg why) ASK_KIND=Review ASK_REF="$REPO#$N" ASK_TONE=care ASK_SAY="$say" ASK_TARGET="#$N" ASK_AFTER=" as $ACCT" ASK_ACTION=$action \
@@ -1776,7 +1835,9 @@ mcp_server() {
       tools/call)
         (
           ARGS=$(jq -c '.params.arguments // {}' <<<"$line") name=$(jq -r '.params.name' <<<"$line")
-          err=$(mktemp) out=$(run_tool "$name" 2>"$err"); rc=$?
+          # a fresh sangam each call: a server started before an update still
+          # runs the current code (and the current popup)
+          err=$(mktemp) out=$(ARGS=$ARGS "$self" --mcp-tool "$name" 2>"$err"); rc=$?
           ((rc)) && [ -s "$err" ] && out+=$'\n'$(tail -c 2000 "$err")
           rm -f "$err"
           reply "$(jq -cn --argjson id "$id" --arg t "$out" --argjson e "$([ $rc = 0 ] && echo false || echo true)" \
@@ -1851,6 +1912,7 @@ case $1 in
   --action) set_pr "$3" && action "$2" "$N"; exit ;;
   --full) set_pr "$2" && open_full "$N"; exit ;;
   --approve-ui) approve_ui; exit ;;
+  --mcp-tool) check_agent_deps || exit 1; run_tool "$2"; exit ;;
 esac
 
 # ------------------------------------------------------------------ CLI

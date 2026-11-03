@@ -89,12 +89,25 @@ t send-keys -t o u; sleep .6
 s=$(screen); grep -qF "hello there" <<<"$s" || fail "u didn't undo"
 grep -qF "edited by you" <<<"$s" && fail "u left the label"
 
+# The oldest servers (before 2.2) wrote only what and details: the popup still
+# reads the merge out of them (the screenshot that found this: "merge-merge").
+oldest=$tmp/oldest; mkdir -p "$oldest"; printf 'merge-merge acme/shop#29' >"$oldest/what"; date +%s >"$oldest/since"
+printf 'Fix the follow-ups\nfeat/x → development · open\nmergeable: mergeable (clean) · review:  · checks: pass\nas sam\n' >"$oldest/details"
+stop; t new -d -s o -x 150 -y 40 "env -u TMUX SANGAM_ASK='$oldest' bash '$here/bin/sangam' --approve-ui; sleep 30"; sleep 1.2
+s=$(screen)
+for want in "approve a merge" "acme/shop#29" "An agent wants to merge into development" "lands on development" "undo is a revert" \
+    "Ready to merge" "✓ Checks: passed" "✓ No conflicts" "From     feat/x" "As       sam" "development gets it" "Merge into development"; do
+  grep -qF "$want" <<<"$s" || fail "oldest request: missing $want"
+done
+grep -qF "merge-merge" <<<"$s" && fail "oldest request: shows merge-merge"
+stop
+
 # A request from an older sangam still running shows everything it has.
 old=$tmp/old; mkdir -p "$old"; printf 'Claude Code' >"$old/who"; printf 'merge (squash) acme/shop#7' >"$old/what"
-printf 'Fix the thing\nas sam\n' >"$old/details"; printf 'lands on main' >"$old/risk"; printf 'commits that land:\n  a1f3c09 Fix\n' >"$old/extra"; : >"$old/why"; date +%s >"$old/since"
+printf 'Fix the thing\nfix/x → main · open\nmergeable: mergeable (clean) · review: approved · checks: pass\nas sam\n' >"$old/details"; printf 'lands on main' >"$old/risk"; printf 'commits that land:\n  a1f3c09 Fix\n' >"$old/extra"; : >"$old/why"; date +%s >"$old/since"
 stop; t new -d -s o -x 150 -y 40 "env -u TMUX SANGAM_ASK='$old' bash '$here/bin/sangam' --approve-ui 2>'$tmp/old-err'; sleep 30"; sleep 1.2
 s=$(screen)
-for want in "Claude Code wants to merge (squash) acme/shop#7" "lands on main" "Fix the thing" "as sam" "a1f3c09" "Approve" "Decline"; do
+for want in "Claude Code wants to squash and merge into main" "lands on main" "Fix the thing" "As       sam" "a1f3c09" "✓ Review: approved" "Merge into main" "Decline"; do
   grep -qF "$want" <<<"$s" || fail "old request: missing $want"
 done
 [ ! -s "$tmp/old-err" ] || fail "old request: errors: $(cat "$tmp/old-err")"
@@ -150,6 +163,12 @@ out=$(call pr_merge '{"pr":"acme/shop#9","auto":true,"delete_branch":true,"why":
 grep -q "declined" <<<"$out" || fail "a no is not reported as declined: $out"
 [ ! -e "$tmp/gh-writes" ] || fail "merged after a no"
 grep -q -- " -B " "$tmp/popup-args" || fail "the popup keeps tmux's border"
+# every label and every detail row shows, the last one too (no newline at its end)
+request last; printf 'bad\tfirst label\nplain\tlast label' >"$tmp/last/chips"; printf 'H\tThe merge\nF\tFrom\tx\nF\tAs\tlast-row' >"$tmp/last/facts"
+open last 150 40; s=$(screen)
+for want in "first label" "last label" "last-row"; do grep -qF "$want" <<<"$s" || fail "missing the $want"; done
+# the countdown stays clear of the border
+grep -q "is a no│" <<<"$s" && fail "the countdown runs into the border"
 seen "Auto-merge" kind; seen danger tone; seen "merge into" say; seen main target; seen "Turn on auto-merge" action
 seen "not ready: Checks: 1 failed, 1 passed" chips; seen "merges later" chips; seen "lands on main" chips; seen "deletes the branch" chips; seen "moves #10" chips
 seen "Not ready yet" facts; seen "✗"$'\t'"Checks: 1 failed" facts; seen "○"$'\t'"Review: needs an approval" facts; seen "fix/search" facts

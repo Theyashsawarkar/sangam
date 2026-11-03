@@ -2,6 +2,16 @@
 
 Newest first.
 
+## v2.3.2 -- 2026-11-03
+
+- **An agent's server started before an update showed a broken popup** ("an
+  agent wants to merge-merge…", the details as raw text). Each tool call now
+  runs in a fresh sangam, so a running server always uses the current code; and
+  requests from servers older still are read into the new screen in full.
+- Fixed: the last label and the last detail row (often "As") didn't show; the
+  countdown could run into the border; a review read "request changes #29";
+  long values were cut without "…".
+
 ## v2.3.1 -- 2026-11-03
 
 - Fixed: an agent's `sangam mcp` started before 2.3 and still running opened the
