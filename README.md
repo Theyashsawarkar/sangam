@@ -6,6 +6,15 @@
   </picture>
 </p>
 
+<!-- identity -->
+<p align="center">
+  <b>सं गच्छध्वं सं वदध्वं सं वो मनांसि जानताम् ।<br>
+  देवा भागं यथा पूर्वे संजानाना उपासते ॥</b><br>
+  <i>Move together, speak together, let your minds agree, as the gods of old shared their part in harmony.</i><br>
+  <sub>Ṛgveda 10.191.2</sub>
+</p>
+<!-- /identity -->
+
 <p align="center">
   <b>Review and merge GitHub pull requests without leaving the terminal.</b><br>
   Every PR you care about, across repos and accounts, in one keyboard-driven screen.

@@ -2,6 +2,10 @@
 
 Newest first.
 
+## Unreleased
+
+- A logo and a shloka at the top of the README and the website: every Vayu tool has them now.
+
 ## v2.4.0 -- 2026-11-03
 
 - **The approval popup now has everything its design shows.**

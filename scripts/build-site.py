@@ -213,6 +213,7 @@ background:radial-gradient(600px 300px at 20% 30%,var(--glow),transparent 70%),r
 .eyebrow{font:600 13px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
 .hero h1{font-size:clamp(40px,6vw,64px);line-height:1.04;margin:12px 0 6px;letter-spacing:-.03em}
 .hero .sa{font-size:22px;color:var(--accent);margin-bottom:18px}.hero .sa span{color:var(--ov1)}
+.hero .shloka{margin:0 0 26px;padding-left:16px;border-left:3px solid var(--accent);max-width:720px}.hero .shloka p{margin:0 0 6px;font-size:18px;line-height:1.6;color:var(--text)}.hero .shloka figcaption{font-size:14px;color:var(--sub0)}.hero .shloka cite{color:var(--ov1);font-style:normal;white-space:nowrap}
 .hero p.lead{font-size:19px;color:var(--sub0);max-width:720px;margin:0 0 26px}
 .cta{display:flex;gap:10px;flex-wrap:wrap}
 .btn{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:12px;font-weight:600;font-size:15px;border:1px solid rgba(255,255,255,.12);color:var(--text);background:rgba(255,255,255,.04)}
@@ -385,7 +386,8 @@ def build():
             files[os.path.join("assets", rel[len("assets/"):])] = open(src, "rb").read()
     files["assets/site.css"] = CSS.strip().encode()
 
-    # ---- home: the README without its banner/badges block
+    # ---- home: the README without its banner/badges block (the hero has the shloka)
+    readme = re.sub(r"(?s)<!-- identity -->.*?<!-- /identity -->\s*", "", readme)
     body_md = readme
     stripped = re.sub(r"(?s)^(\s*<p align=\"center\">.*?</p>\s*)+", "", readme)
     # keep the first screenshot block for the page body if it was among the stripped ones
@@ -400,12 +402,17 @@ def build():
     latest = latest if latest.startswith("v") or not latest else "v" + latest
     adrs = sorted(f for f in os.listdir(os.path.join(ROOT, "docs", "adr")) if re.match(r"\d{4}-.+\.md$", f)) \
         if os.path.isdir(os.path.join(ROOT, "docs", "adr")) else []
+    shloka = ""
+    if meta.get("shloka"):
+        verse = html.escape(meta["shloka"]).replace("\n", "<br>")
+        shloka = (f'<figure class="shloka"><p lang="sa">{verse}</p><figcaption>{html.escape(meta.get("shloka_meaning", ""))} '
+                  f'<cite>{html.escape(meta.get("shloka_source", ""))}</cite></figcaption></figure>\n')
     hero = f"""<section class="hero"><div class="in"><div>
 <div class="eyebrow">{html.escape(meta.get("kind", "open source"))}</div>
 <h1>{name}</h1>
 <div class="sa">{meta.get("sanskrit", "")} <span>· “{html.escape(meta.get("meaning", ""))}”</span></div>
 <p class="lead">{html.escape(meta["tagline"])}</p>
-<div class="cta"><a class="btn primary" href="#install">Install</a><a class="btn" href="{GH}/{name}">GitHub ↗</a>
+{shloka}<div class="cta"><a class="btn primary" href="#install">Install</a><a class="btn" href="{GH}/{name}">GitHub ↗</a>
 <a class="btn" href="changelog.html">What's new{(' in ' + latest) if latest else ''}</a></div>
 <div class="meta"><span><b>{latest or 'unreleased'}</b> latest</span><span><b>{len([v for v in vers if v[0] != 'Unreleased'])}</b> releases</span><span><b>{len(adrs)}</b> decisions recorded</span><span><b>MIT</b> license</span></div>
 </div><img class="logo" src="assets/logo.svg" alt="{name} logo"></div></section>"""
