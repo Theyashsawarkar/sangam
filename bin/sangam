@@ -85,7 +85,7 @@ FZF_COLORS+=",header:$DIMH,header-border:$LINEH,header-label:$DIMH"
 
 STATES=(open merged closed all)
 NORMAL_KEYS='j,k,g,G,h,l,J,K,1,2,3,4,f,F,u,s,S,R,E,m,a,r,c,x,o,d,y,b,q,/,?'
-VERSION=2.3.2
+VERSION=2.4.0
 CONFIG=${XDG_CONFIG_HOME:-$HOME/.config}/sangam/sections
 CROOT=${XDG_CACHE_HOME:-$HOME/.cache}/sangam
 # Sections from before the rename (tmux-gh-pr) carry over once.
@@ -1350,7 +1350,7 @@ ask_approval() {
   date +%s >"$d/since"
   # What the screen shows (approve_ui): the sentence, labels, details, the frame.
   printf '%s' "${ASK_KIND:-Request}" >"$d/kind"; printf '%s' "${ASK_REF:-}" >"$d/ref"; printf '%s' "${ASK_TONE:-care}" >"$d/tone"
-  printf '%s' "${ASK_SAY:-$1}" >"$d/say"; printf '%s' "${ASK_TARGET:-}" >"$d/target"; printf '%s' "${ASK_AFTER:-}" >"$d/after"
+  printf '%s' "${ASK_SAY-$1}" >"$d/say"; printf '%s' "${ASK_TARGET:-}" >"$d/target"; printf '%s' "${ASK_AFTER:-}" >"$d/after"
   printf '%s' "${ASK_ACTION:-Approve}" >"$d/action"; printf '%s' "${ASK_TITLE:-the text, as it will show}" >"$d/title"
   printf '%s' "${ASK_CHIPS:-}" >"$d/chips"; printf '%s' "${ASK_FACTS:-}" >"$d/facts"; printf '%s' "${ASK_FRAME:-}" >"$d/frame"
   printf '%s' "${ASK_URL:-}" >"$d/url"; printf '%s' "${ASK_LOG:-}" >"$d/log"
@@ -1419,17 +1419,32 @@ action() {
 frame_lines() {
   local w=$1 d=$2
   if [ -f "$d/text" ]; then
-    mapfile -t FRAME < <(fold -s -w "$w" "$d/text" | { bat -l md --color=always --style=plain --paging=never --wrap=never 2>/dev/null || cat; })
+    # as GitHub shows it: headings bold without their #, `code` and @tags marked
+    mapfile -t FRAME < <(indent_fold "$w" <"$d/text" | sed -E \
+      -e "s/^#{1,6} +(.*)\$/$b$fg\1$r/" -e "s/\*\*([^*]+)\*\*/$b\1$r/g" -e "s/\`([^\`]+)\`/$gold\1$r/g" \
+      -e "s/(^|[^[:alnum:]_])(@[[:alnum:]][[:alnum:]-]*)/\1$gold\2$r/g")
   else
-    mapfile -t FRAME < <(fold -s -w "$w" "$d/frame")
+    mapfile -t FRAME < <(indent_fold "$w" <"$d/frame" | sed -E \
+      -e "s/^([^ ].*)\$/$dim\1$r/" -e "s/^  ([0-9a-f]{7})  /  $gold\1$r  /" \
+      -e "s/^  ✗ /  $red✗$r /" -e "s/^  ✓ /  $green✓$r /" -e "s/^  ○ /  $gold○$r /" -e "s/^    (.*)\$/    $dim\1$r/")
   fi
+}
+
+# indent_fold <width>: fold -s, a long line's next lines indented like it
+indent_fold() {
+  local l pre
+  while IFS= read -r l || [ -n "$l" ]; do
+    pre=${l%%[! ]*}
+    if ((${#l} <= $1)) || ((${#pre} >= $1 / 2)); then fold -s -w "$1" <<<"$l"
+    else fold -s -w $(($1 - ${#pre})) <<<"${l:${#pre}}" | sed "s/^/$pre/"; fi
+  done
 }
 
 approve_draw() {
   local d=$1 W H cw two factw row="" line c lab val n i tone who title
   W=$(tput cols) H=$(tput lines); cw=$((W - 6)); ((cw < 20)) && cw=20
   case $(cat "$d/tone") in danger) tone=$red ;; safe) tone=$rose ;; *) tone=$gold ;; esac
-  who=$(cat "$d/who"); title=" sangam · approve a $(tr '[:upper:]' '[:lower:]' <"$d/kind") "
+  who=$(cat "$d/who"); title=" sangam · approve a $(tr '[:upper:]' '[:lower:]' <"$d/kind" | sed 's/^auto-merge$/merge/') "
   printf '\e[2J'
   # the border says how much is at stake
   at 1 1; printf '%s╭─%s' "$tone" "$title"; printf '─%.0s' $(seq 1 $((W - 3 - ${#title} > 0 ? W - 3 - ${#title} : 1))); printf '╮'
@@ -1442,9 +1457,9 @@ approve_draw() {
   # one sentence: who wants what
   row=$((row + 2))
   local say target after plain
-  say=$(cat "$d/say") target=$(cat "$d/target") after=$(cat "$d/after"); plain="$who wants to $say $target$after"
+  say=$(cat "$d/say") target=$(cat "$d/target") after=$(cat "$d/after"); say=${say:+$say }; plain="$who wants to $say$target$after"
   if ((${#plain} <= cw)); then
-    at "$row" 4; printf '%s%s wants to %s %s%s%s%s%s%s' "$b$fg" "$who" "$say" "$r" "$tone$b" "$target" "$r" "$b$fg" "$after$r"; row=$((row + 1))
+    at "$row" 4; printf '%s%s wants to %s%s%s%s%s%s%s' "$b$fg" "$who" "$say" "$r" "$tone$b" "$target" "$r" "$b$fg" "$after$r"; row=$((row + 1))
   else
     while IFS= read -r line; do at "$row" 4; printf '%s%s%s' "$b$fg" "$line" "$r"; row=$((row + 1)); done < <(fold -s -w "$cw" <<<"$plain")
   fi
@@ -1461,19 +1476,28 @@ approve_draw() {
     at "$row" "$x"; chip "$kind" "$text"; x=$((x + ${#text} + 3))
   done <"$d/.chips"
   row=$((row + 2))
-  # the answers, pinned to the bottom
-  local foot=$((H - 1))
-  ACTIONS=$(
-    if [ -f "$d/text" ] && ! cmp -s "$d/text" "$d/orig"; then action y "$(cat "$d/action") (my version)" go
-    elif [ "$(cat "$d/tone")" = danger ]; then action y "$(cat "$d/action")" danger
-    else action y "$(cat "$d/action")" go; fi
-    printf '  '; [ -f "$d/text" ] && { action e Edit; printf '  '; }
-    [ -f "$d/text" ] && ! cmp -s "$d/text" "$d/orig" && { action u "Undo my edit"; printf '  '; }
-    action n Decline stop
-    [ -s "$d/diff" ] && ((cw >= 60)) && { printf '  '; action d Diff; }
-    [ -s "$d/log" ] && ((cw >= 60)) && { printf '  '; action l "Failed log"; }
-    [ -s "$d/url" ] && ((cw >= 70)) && { printf '  '; action b GitHub; }
-  )
+  # the answers, pinned to the bottom: one row, or two when that's too narrow
+  local foot=$((H - 1)) edited=0 hint="j/k scroll" acts=() a w1=0
+  [ -f "$d/text" ] && ! cmp -s "$d/text" "$d/orig" && edited=1
+  case $(cat "$d/kind") in Merge | Auto-merge) hint="Enter does nothing here" ;; esac
+  if ((edited)); then acts+=("$(action y "$(cat "$d/action") (my version)" go)")
+  elif [ "$(cat "$d/tone")" = danger ]; then acts+=("$(action y "$(cat "$d/action")" danger)")
+  else acts+=("$(action y "$(cat "$d/action")" go)"); fi
+  [ -f "$d/text" ] && acts+=("$(action e "$( ((edited)) && echo "Edit again" || echo "Edit first")")")
+  ((edited)) && acts+=("$(action u "Undo my edit")")
+  acts+=("$(action n Decline stop)")
+  [ -s "$d/log" ] && acts+=("$(action l "Open the failed log")")
+  [ -s "$d/diff" ] && acts+=("$(action d "View the diff")")
+  [ -s "$d/url" ] && acts+=("$(action b "Open on GitHub")")
+  ACTIONS="" ACTIONS2=""
+  for a in "${acts[@]}"; do
+    w1=$((w1 + $(vis_len "$a") + 2))
+    if ((w1 - 2 <= cw)) && [ -z "$ACTIONS2" ]; then ACTIONS+="$a  "; else ACTIONS2+="$a  "; fi
+  done
+  if [ -z "$ACTIONS2" ] && ((w1 + ${#hint} <= cw)); then
+    ACTIONS+=$(printf '%*s%s%s%s' $((cw - w1 - ${#hint})) '' "$dim" "$hint" "$r")
+  fi
+  if [ -n "$ACTIONS2" ]; then foot=$((H - 2)); fi
   # the middle: details beside the frame, or above it when narrow
   local bot=$((foot - 2)) top=$row fx fw fh
   ((bot < top + 2)) && bot=$((top + 2))
@@ -1486,11 +1510,13 @@ approve_draw() {
     at "$n" 4
     case $c in
       H) printf '%s%s%s' "$dim" "${lab:0:factw}" "$r" ;;
+      P) printf '%s·%s %s %s%s%s' "$dim" "$r" "$(cut_to "$lab" $((factw - 4 - ${#val})))" "$dim" "$val" "$r" ;;
       F) case $lab in
            ✓) printf '%s\e[1m%s%s %s' "$green" "$lab" "$r" "$(cut_to "$val" $((factw - 2)))" ;;
            ✗) printf '%s\e[1m%s%s %s' "$red" "$lab" "$r" "$(cut_to "$val" $((factw - 2)))" ;;
            ○) printf '%s\e[1m%s%s %s' "$gold" "$lab" "$r" "$(cut_to "$val" $((factw - 2)))" ;;
            ·) printf '%s%s %s%s' "$dim" "$lab" "$(cut_to "$val" $((factw - 2)))" "$r" ;;
+           ●) printf '%s\e[1m%s%s %s' "$gold" "$lab" "$r" "$(cut_to "$val" $((factw - 2)))" ;;
            *) printf '%s%-8s%s %s' "$dim" "$lab" "$r" "$(cut_to "$val" $((factw - 9)))" ;;
          esac ;;
     esac
@@ -1501,7 +1527,7 @@ approve_draw() {
   fh=$((bot - top - 1))
   FX=$fx FW=$fw FTOP=$top FH=$fh
   # no room for the frame (a tiny terminal): just the answers
-  if ((fh < 1)); then FH=0; at "$foot" 4; printf '%s' "$ACTIONS"; return; fi
+  if ((fh < 1)); then FH=0; approve_actions "$foot"; return; fi
   frame_lines "$((fw - 4))" "$d"
   # its edges
   title=" $(cat "$d/title") "
@@ -1509,7 +1535,41 @@ approve_draw() {
   for ((i = 1; i <= fh; i++)); do at "$((top + i))" "$fx"; printf '%s│%s' "$dim" "$r"; at "$((top + i))" "$((fx + fw - 1))"; printf '%s│%s' "$dim" "$r"; done
   at "$((top + fh + 1))" "$fx"; printf '%s╰' "$dim"; printf '─%.0s' $(seq 1 $((fw - 2 > 0 ? fw - 2 : 1))); printf '╯%s' "$r"
   approve_frame
-  at "$foot" 4; printf '%s' "$ACTIONS"
+  approve_actions "$foot"
+}
+
+approve_actions() {
+  at "$1" 4; printf '%s' "$ACTIONS"
+  [ -n "$ACTIONS2" ] && { at "$(($1 + 1))" 4; printf '%s' "$ACTIONS2"; }
+  return 0
+}
+
+# vis_len <text>: its width on screen, colours left out
+vis_len() { local t; t=$(sed 's/\x1b\[[0-9;]*m//g' <<<"$1"); printf '%s' "${#t}"; }
+
+# approve_result <yes|no|expired> <dir>: a moment saying what your answer did,
+# then the popup closes. The answer is already written: the agent goes on.
+approve_result() {
+  local d=$2 W H big sub tiny col kind
+  W=$(tput cols) H=$(tput lines); kind=$(cat "$d/kind" 2>/dev/null)
+  case $1 in
+    yes) col=$green big="✓ Approved"
+      case $kind in
+        Merge) sub="It merges into $(cat "$d/target") now." ;;
+        Auto-merge) sub="Auto-merge goes on now: it merges once it's ready." ;;
+        Comment) sub="The comment is posted now." ;;
+        Review) sub="The review is submitted now." ;;
+        *) sub="It goes ahead now." ;;
+      esac
+      tiny="closing" ;;
+    no) col=$red big="✗ Declined" sub="Nothing was done. $(cat "$d/who") has been told." tiny="closing" ;;
+    *) col=$gold big="Expired: no answer in $((ASK_TIMEOUT / 60)) minutes" sub="Counted as a no. Nothing was done." tiny="the agent can ask again" ;;
+  esac
+  printf '\e[2J'
+  at $((H / 2 - 1)) $(((W - ${#big}) / 2 > 1 ? (W - ${#big}) / 2 : 1)); printf '%s\e[1m%s%s' "$col" "$(cut_to "$big" $((W - 2)))" "$r"
+  at $((H / 2)) $(((W - ${#sub}) / 2 > 1 ? (W - ${#sub}) / 2 : 1)); printf '%s%s%s' "$fg" "$(cut_to "$sub" $((W - 2)))" "$r"
+  at $((H / 2 + 1)) $(((W - ${#tiny}) / 2 > 1 ? (W - ${#tiny}) / 2 : 1)); printf '%s%s%s' "$dim" "$tiny" "$r"
+  sleep "${SANGAM_RESULT_SECS:-0.9}"
 }
 
 # The frame's inside, at the current scroll. No clearing: each row is
@@ -1557,8 +1617,8 @@ upgrade_request() {
       kind=Merge tone=danger target=${base:-its base} action="Merge into ${base:-its base}"
       case $what in *squash*) say="squash and merge into" ;; *rebase*) say="rebase and merge into" ;; *) say="merge into" ;; esac ;;
     'comment on'*) kind=Comment say="comment on" target=$ref action="Post the comment" ;;
-    'request changes'*) kind=Review say="request changes on" target=$ref action="Submit the review" ;;
-    approve*) kind=Review say="approve" target=$ref action="Approve the PR" ;;
+    'request changes'*) kind=Review say="" target="request changes" after=${as:+ as $as} action="Submit the review" ;;
+    approve*) kind=Review say="" target="approve" after=${as:+ as $as} action="Approve the PR" ;;
     *) say=${what% "$ref"}; target=$ref ;;
   esac
   title=${title_line:-the request}
@@ -1610,7 +1670,7 @@ approve_ui() {
   while IFS= read -rsn1 -t 0.4 _; do :; done
   while :; do
     left=$((ASK_TIMEOUT - $(date +%s) + since))
-    ((left > 0)) || { echo no >"$d/answer"; return; }
+    ((left > 0)) || { echo no >"$d/answer"; approve_result expired "$d"; return; }
     if ((redraw)); then redraw=0 shown=""; approve_draw "$d"; fi
     if [ "$left" != "$shown" ]; then
       shown=$left
@@ -1618,8 +1678,8 @@ approve_ui() {
     fi
     k=""; IFS= read -rsn1 -t 1 k || continue
     case $k in
-      y | Y) echo yes >"$d/answer"; return ;;
-      n | N | q | $'\e') echo no >"$d/answer"; return ;;
+      y | Y) echo yes >"$d/answer"; approve_result yes "$d"; return ;;
+      n | N | q | $'\e') echo no >"$d/answer"; approve_result no "$d"; return ;;
       j) SCROLL=$((SCROLL + 1)); approve_frame ;;
       k) SCROLL=$((SCROLL - 1)); approve_frame ;;
       e | E)  # an editor with arguments (code --wait) splits into words
@@ -1646,30 +1706,47 @@ asked() {
   esac
 }
 
-# pr_facts: the PR's title and state as lines for the details pane, and its
-# URL and title for the rest of the request.
+# pr_facts [size]: the PR's title, state and branch as lines for the details
+# pane (and its size, for a review), its URL and title for the rest of the
+# request, and in PR_JSON what gh said.
 pr_facts() {
-  local j
-  j=$(timeout 30 gh pr view "$N" -R "$REPO" --json title,state,isDraft,author,headRefName,baseRefName,additions,deletions,changedFiles,url 2>/dev/null) || j='{}'
-  ASK_URL=$(jq -r '.url // empty' <<<"$j")
-  PR_TITLE=$(jq -r '.title // empty' <<<"$j")
-  ASK_FACTS=$(jq -r --arg as "$ACCT" '
+  PR_JSON=$(timeout 30 gh pr view "$N" -R "$REPO" --json title,state,isDraft,author,headRefName,baseRefName,additions,deletions,changedFiles,url,reviewRequests,latestReviews 2>/dev/null) || PR_JSON='{}'
+  ASK_URL=$(jq -r '.url // empty' <<<"$PR_JSON")
+  PR_TITLE=$(jq -r '.title // empty' <<<"$PR_JSON")
+  ASK_FACTS=$(jq -r --arg size "${1:-}" '
     "H\tThe pull request",
     "F\tTitle\t\(.title // "?")",
     "F\tState\t\((.state // "?") | ascii_downcase)\(if .isDraft then ", draft" else "" end) · by \(.author.login // "?")",
-    "F\tBranch\t\(.headRefName // "?") → \(.baseRefName // "?")",
-    "F\tSize\t+\(.additions // 0) -\(.deletions // 0) in \(.changedFiles // 0) files",
-    "F\tAs\t\($as)"' <<<"$j")
+    "F\tBranch\t\(.headRefName // "?") to \(.baseRefName // "?")",
+    (if $size != "" then "F\tSize\t+\(.additions // 0) -\(.deletions // 0) in \(.changedFiles // 0) files" else empty end)' <<<"$PR_JSON")
+}
+
+# notified <text>: who GitHub tells about a comment or review, one "login\trole"
+# a line: the author, the reviewers, anyone the text tags. Not you.
+notified() {
+  { jq -r '(.author.login // empty | "\(.)\tauthor"),
+      ((.reviewRequests // [])[] | (.login // .name // empty) | "\(.)\treviewer"),
+      ((.latestReviews // [])[] | .author.login // empty | "\(.)\treviewer")' <<<"$PR_JSON"
+    grep -oE '(^|[^[:alnum:]_])@[[:alnum:]][[:alnum:]-]*' <<<"$1" | sed -E 's/^[^@]*@//; s/$/\tmentioned/'
+  } | awk -F'\t' -v me="$ACCT" 'tolower($1) != tolower(me) && !seen[tolower($1)]++'
+}
+
+# notify_chip <people>: "notifies priya-n", or "notifies 3 people"
+notify_chip() {
+  local n; n=$(grep -c . <<<"$1")
+  case $n in 0) ;; 1) printf 'plain\tnotifies %s\n' "${1%%$'\t'*}" ;; *) printf 'plain\tnotifies %d people\n' "$n" ;; esac
 }
 
 tool_pr_comment() {
-  local body out; body=$(arg body)
+  local body out people; body=$(arg body)
   [ -n "$body" ] || { echo "body is empty"; return 1; }
   parse_pr "$(arg pr)" || return 1
   use_account "$(arg account)" || return 1
   pr_facts
+  people=$(notified "$body")
+  [ -n "$people" ] && ASK_FACTS+=$'\nH\t \nH\tWho gets notified\n'$(sed 's/^/P\t/' <<<"$people")
   ASK_WHY=$(arg why) ASK_KIND=Comment ASK_REF="$REPO#$N" ASK_TONE=care ASK_SAY="comment as" ASK_TARGET=$ACCT ASK_ACTION="Post the comment" \
-    ASK_TITLE="the comment, as it will show" ASK_CHIPS=$'warn\tpublic on the PR\nplain\tnotifies the people on it' \
+    ASK_TITLE="the comment, as it will show" ASK_CHIPS=$'warn\tpublic on the PR\n'$(notify_chip "$people") \
     asked "comment on $REPO#$N" "$PR_TITLE"$'\n'"as $ACCT" "$body" || return 1
   [ -n "$ASKED_TEXT" ] || { echo "Nothing done: the user emptied the comment."; return 1; }
   out=$(timeout 60 gh pr comment "$N" -R "$REPO" --body-file - <<<"$ASKED_TEXT" 2>&1) || { echo "gh pr comment failed: $out"; return 1; }
@@ -1689,14 +1766,24 @@ tool_pr_review() {
   [ "$ev" = approve ] || [ -n "$body" ] || { echo "$ev needs a body"; return 1; }
   parse_pr "$(arg pr)" || return 1
   use_account "$(arg account)" || return 1
-  local verb say chips action
+  local verb what chips action icon row before people
   case $ev in
-    approve) verb="approve $REPO#$N" say="approve" action="Approve the PR" chips=$'warn\tcounts toward merging\nplain\tpublic on the PR' ;;
-    request_changes) verb="request changes on $REPO#$N" say="request changes on" action="Submit the review" chips=$'warn\tblocks the merge until resolved\nplain\tpublic on the PR' ;;
-    *) verb="review $REPO#$N" say="comment in a review on" action="Submit the review" chips=$'plain\tpublic on the PR\nplain\tnotifies the people on it' ;;
+    approve) verb="approve $REPO#$N" what="approve" action="Approve the PR" icon=✓ row="Approve" chips=$'warn\tcounts toward merging\nplain\tpublic on the PR' ;;
+    request_changes) verb="request changes on $REPO#$N" what="request changes" action="Submit the review" icon=● row="Request changes" chips=$'warn\tblocks the merge until resolved\nplain\tpublic on the PR' ;;
+    *) verb="review $REPO#$N" what="comment in a review" action="Submit the review" icon=· row="Comment, without approving" chips=$'plain\tpublic on the PR' ;;
   esac
-  pr_facts
-  ASK_WHY=$(arg why) ASK_KIND=Review ASK_REF="$REPO#$N" ASK_TONE=care ASK_SAY="$say" ASK_TARGET="#$N" ASK_AFTER=" as $ACCT" ASK_ACTION=$action \
+  pr_facts size
+  # your last review on it, which this one takes the place of
+  before=$(jq -r --arg me "$ACCT" '[(.latestReviews // [])[] | select((.author.login // "" | ascii_downcase) == ($me | ascii_downcase)) | .state][-1] // empty' <<<"$PR_JSON")
+  people=$(jq -r '.author.login // empty | select(. != "")' <<<"$PR_JSON" | awk -v me="$ACCT" 'tolower($0) != tolower(me)')
+  chips+=$'\n'$(notify_chip "${people:+$people$'\t'author}")
+  ASK_FACTS+=$'\nH\t \nH\tThis review\nF\t'"$icon"$'\t'"$row"
+  case $before:$ev in
+    APPROVED:approve | CHANGES_REQUESTED:request_changes) ;;
+    APPROVED:*) ASK_FACTS+=$'\nF\t·\tReplaces your earlier approval' ;;
+    CHANGES_REQUESTED:*) ASK_FACTS+=$'\nF\t·\tReplaces your earlier request for changes' ;;
+  esac
+  ASK_WHY=$(arg why) ASK_KIND=Review ASK_REF="$REPO#$N" ASK_TONE=care ASK_SAY="" ASK_TARGET="$what" ASK_AFTER=" as $ACCT" ASK_ACTION=$action \
     ASK_TITLE="the review, as it will show" ASK_CHIPS=$chips ASK_DIFF=$(timeout 20 gh pr diff "$N" -R "$REPO" --color=never 2>/dev/null) \
     asked "$verb" "$PR_TITLE"$'\n'"as $ACCT" "$body" || return 1
   [ "$ev" = approve ] || [ -n "$ASKED_TEXT" ] || { echo "Nothing done: the user emptied the review."; return 1; }
@@ -1706,6 +1793,49 @@ tool_pr_review() {
   [ "$ASKED_TEXT" = "$body" ] || printf '\nThe user edited it first; what was submitted:\n%s\n' "$ASKED_TEXT"
 }
 
+# count <n> <thing>: "1 commit", "3 commits"
+count() { if (($1 == 1)); then printf '1 %s' "$2"; else printf '%d %ss' "$1" "$2"; fi; }
+
+# merge_blockers (gh pr view JSON on stdin): what keeps a PR from merging, a
+# line each, failed checks with when and how to see why.
+merge_blockers() {
+  jq -r '
+    def ago: (now - (try (sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) catch now)) as $s
+      | if $s < 90 then "just now" elif $s < 5400 then "\($s / 60 | floor) minutes ago"
+        elif $s < 129600 then "\($s / 3600 | floor) hours ago" else "\($s / 86400 | floor) days ago" end;
+    def bad: (.conclusion // .state // "") | test("FAILURE|ERROR|TIMED_OUT|CANCELLED|ACTION_REQUIRED|STARTUP_FAILURE");
+    def name: if (.workflowName // "") != "" then "\(.workflowName) / \(.name)" else (.name // .context // "a check") end;
+    (.statusCheckRollup // []) as $c
+    | ([$c[] | select(bad)] | to_entries[]
+       | "  ✗ \(.value | name)",
+         "    failed \(.value.completedAt // .value.startedAt // .value.createdAt // "" | if . == "" then "" else ago end)\(if .key == 0 and ((.value.detailsUrl // .value.targetUrl // "") != "") then " · l opens the log" else "" end)"),
+      ([$c[] | select(((.status // "COMPLETED") != "COMPLETED") or ((.state // "") | test("PENDING|EXPECTED")))] | length
+        | select(. > 0) | "  ○ \(.) check\(if . == 1 then "" else "s" end) still running"),
+      (if .reviewDecision == "CHANGES_REQUESTED" then
+         "  ✗ Changes requested by \([(.latestReviews // [])[] | select(.state == "CHANGES_REQUESTED") | .author.login] | if length > 0 then join(", ") else "a reviewer" end)"
+       elif .reviewDecision == "REVIEW_REQUIRED" then
+         "  ○ Waiting for a review\([(.reviewRequests // [])[] | (.login // .name // empty)] | if length > 0 then " from " + join(", ") else "" end)"
+       else empty end),
+      (if .mergeable == "CONFLICTING" then "  ✗ Conflicts with \(.baseRefName)" else empty end),
+      (if .isDraft then "  ○ It is still a draft" else empty end)'
+}
+
+# merge_when (the same JSON): what has to happen first, as one clause
+merge_when() {
+  jq -r '
+    def bad: (.conclusion // .state // "") | test("FAILURE|ERROR|TIMED_OUT|CANCELLED|ACTION_REQUIRED|STARTUP_FAILURE");
+    def and_list: if length <= 1 then (.[0] // "") else (.[:-1] | join(", ")) + " and " + .[-1] end;
+    (.statusCheckRollup // []) as $c | ([$c[] | select(bad)] | length) as $f
+    | ([$c[] | select(((.status // "COMPLETED") != "COMPLETED") or ((.state // "") | test("PENDING|EXPECTED")))] | length) as $p
+    | [(.reviewRequests // [])[] | (.login // .name // empty)] as $who
+    | [ (if $f == 1 then "the check passes" elif $f > 1 then "the checks pass" elif $p > 0 then "the running checks pass" else empty end),
+        (if .reviewDecision == "REVIEW_REQUIRED" then (if ($who | length) > 0 then ($who | and_list) + (if ($who | length) == 1 then " approves" else " approve" end) else "it is approved" end)
+         elif .reviewDecision == "CHANGES_REQUESTED" then "the requested changes are approved" else empty end),
+        (if .mergeable == "CONFLICTING" then "the conflicts are fixed" else empty end),
+        (if .isDraft then "it is marked ready" else empty end) ]
+    | if length == 0 then "it is ready" else and_list end'
+}
+
 tool_pr_merge() {
   local how auto del out
   how=$(arg method); how=${how:-squash} auto=$(arg auto) del=$(arg delete_branch)
@@ -1713,12 +1843,19 @@ tool_pr_merge() {
   parse_pr "$(arg pr)" || return 1
   use_account "$(arg account)" || return 1
   local j
-  j=$(timeout 30 gh pr view "$N" -R "$REPO" --json title,state,isDraft,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,headRefName,baseRefName,commits,url,additions,deletions,changedFiles 2>&1) \
+  j=$(timeout 30 gh pr view "$N" -R "$REPO" --json title,state,isDraft,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,headRefName,baseRefName,commits,url,additions,deletions,changedFiles,reviewRequests,latestReviews 2>&1) \
     || { echo "gh pr view: ${j:0:300}"; return 1; }
   # what lands, and what follows: stacked PRs on this branch move to its base
   local label title head base stacked nready=0 facts chips frame why_not="" failed_url
   case $how in squash) label="squash" ;; merge) label="merge commit" ;; *) label="rebase" ;; esac
   title=$(jq -r .title <<<"$j") head=$(jq -r .headRefName <<<"$j") base=$(jq -r .baseRefName <<<"$j")
+  local ncommits method lands nstacked
+  ncommits=$(jq -r '.commits | length' <<<"$j")
+  case $how in
+    squash) method="squash, $(count "$ncommits" commit) into 1" lands="one new commit" ;;
+    merge) method="merge commit, $(count "$ncommits" commit)" lands="$(count "$ncommits" commit) and a merge commit" ;;
+    *) method="rebase, $(count "$ncommits" commit)" lands="$(count "$ncommits" "new commit")" ;;
+  esac
   stacked=$(timeout 30 gh pr list -R "$REPO" --base "$head" --json number --jq 'map("#\(.number)") | join(", ")' 2>/dev/null)
   # each thing a merge needs: ok, no or wait, then what it says
   local checks review conflicts
@@ -1729,38 +1866,55 @@ tool_pr_merge() {
       elif ($f | length) > 0 then "no\tChecks: \($f | length) failed, \($n - ($f | length) - ($p | length)) passed"
       elif ($p | length) > 0 then "wait\tChecks: \($p | length) running, \($n - ($p | length)) passed"
       else "ok\tChecks: \($n) of \($n) passed" end' <<<"$j")
-  review=$(jq -r 'if .reviewDecision == "APPROVED" then "ok\tReview: approved"
+  review=$(jq -r '[(.latestReviews // [])[] | select(.state == "APPROVED") | .author.login] as $by
+    | if .reviewDecision == "APPROVED" then "ok\tReview: approved\(if ($by | length) > 0 then " by " + ($by | join(", ")) else "" end)"
     elif .reviewDecision == "CHANGES_REQUESTED" then "no\tReview: changes requested"
     elif .reviewDecision == "REVIEW_REQUIRED" then "wait\tReview: needs an approval"
     else "none\tReview: none required" end' <<<"$j")
   conflicts=$(jq -r 'if .mergeable == "MERGEABLE" then "ok\tNo conflicts"
     elif .mergeable == "CONFLICTING" then "no\tHas conflicts" else "wait\tChecking for conflicts" end' <<<"$j")
   local one
-  for one in "$checks" "$review" "$conflicts"; do case ${one%%$'\t'*} in no | wait) nready=$((nready + 1)); why_not=${why_not:-${one#*$'\t'}} ;; esac; done
-  [ "$(jq -r .isDraft <<<"$j")" = true ] && { nready=$((nready + 1)); why_not=${why_not:-"it's a draft"}; }
+  for one in "$checks" "$review" "$conflicts"; do case ${one%%$'\t'*} in no | wait) nready=$((nready + 1)) ;; esac; done
+  [ "$(jq -r .isDraft <<<"$j")" = true ] && nready=$((nready + 1))
+  why_not=$(jq -r '
+    def bad: (.conclusion // .state // "") | test("FAILURE|ERROR|TIMED_OUT|CANCELLED|ACTION_REQUIRED|STARTUP_FAILURE");
+    ([(.statusCheckRollup // [])[] | select(bad)] | length) as $f
+    | if $f > 0 then "\($f) check\(if $f == 1 then "" else "s" end) failed"
+      elif .mergeable == "CONFLICTING" then "has conflicts"
+      elif .reviewDecision == "CHANGES_REQUESTED" then "changes requested"
+      elif .reviewDecision == "REVIEW_REQUIRED" then "needs a review"
+      elif .isDraft then "a draft"
+      else "checks still running" end' <<<"$j")
   facts=$(printf 'H\t%s\n' "$( ((nready)) && echo "Not ready yet" || echo "Ready to merge")"
     for one in "$checks" "$review" "$conflicts"; do
       case ${one%%$'\t'*} in ok) printf 'F\t✓\t%s\n' "${one#*$'\t'}" ;; no) printf 'F\t✗\t%s\n' "${one#*$'\t'}" ;; wait) printf 'F\t○\t%s\n' "${one#*$'\t'}" ;; *) printf 'F\t·\t%s\n' "${one#*$'\t'}" ;; esac
     done
     printf 'H\t \nH\tThe merge\n'
-    printf 'F\tFrom\t%s\nF\tInto\t%s\nF\tMethod\t%s\nF\tAs\t%s\n' "$head" "$base" "$label" "$ACCT"
+    printf 'F\tFrom\t%s\nF\tInto\t%s\nF\tMethod\t%s\nF\tAs\t%s\n' "$head" "$base" "$method" "$ACCT"
     jq -r '"F\tSize\t+\(.additions) -\(.deletions) in \(.changedFiles) files"' <<<"$j")
-  chips="bad"$'\t'"lands on $base"
-  ((nready)) && chips="bad"$'\t'"not ready: $why_not"$'\n'"$chips"
-  [ "$auto" = true ] && chips+=$'\n'"warn"$'\t'"merges later, without asking again"
+  chips=""
+  ((nready)) && chips+="bad"$'\t'"not ready: $why_not"$'\n'
+  [ "$auto" = true ] && chips+="warn"$'\t'"merges later, without asking again"$'\n'
+  chips+="bad"$'\t'"lands on $base"
   chips+=$'\n'"plain"$'\t'"undo is a revert"
   [ "$del" = true ] && chips+=$'\n'"plain"$'\t'"deletes the branch"
-  [ -n "$stacked" ] && chips+=$'\n'"plain"$'\t'"moves $stacked"
+  nstacked=$(tr ',' '\n' <<<"$stacked" | grep -c '#')
+  [ -n "$stacked" ] && chips+=$'\n'"plain"$'\t'"moves $(count "$nstacked" "stacked PR")"
   frame=$(printf 'Commits that land\n'
     jq -r '.commits | length as $n | (.[:12][] | "  \(.oid[0:7])  \(.messageHeadline)"), (if $n > 12 then "  … \($n - 12) more" else empty end)' <<<"$j"
-    if [ "$auto" = true ] && ((nready)); then
-      printf '\nWhat is stopping it\n'
-      jq -r '(.statusCheckRollup // [])[] | select((.conclusion // .state // "") | test("FAILURE|ERROR|TIMED_OUT|CANCELLED|ACTION_REQUIRED|STARTUP_FAILURE")) | "  ✗ \(.name // .context)"' <<<"$j"
-      printf '\nIf you approve\n  Nothing changes now. When everything passes, GitHub merges it into %s\n  without another question.\n' "$base"
+    if ((nready)); then
+      printf '\nWhat'"'"'s stopping it\n'
+      merge_blockers <<<"$j"
+    fi
+    if [ "$auto" = true ]; then
+      printf '\nWhat happens if you approve\n'
+      if ((nready)); then printf '  Nothing changes now. When %s, GitHub merges it into %s without another question.\n' "$(merge_when <<<"$j")" "$base"
+      else printf '  It is ready, so GitHub merges it into %s in a moment, without another question.\n' "$base"; fi
     else
-      printf '\nWhat happens next\n  %s gets it\n' "$base"
-      [ "$del" = true ] && printf '  %s is deleted\n' "$head"
-      [ -n "$stacked" ] && printf '  %s target %s\n' "$stacked" "$base"
+      printf '\nWhat happens next\n  1. %s gets %s\n' "$base" "$lands"
+      local step=2
+      [ "$del" = true ] && { printf '  %d. %s is deleted\n' "$step" "$head"; step=$((step + 1)); }
+      [ -n "$stacked" ] && printf '  %d. %s retarget%s to %s\n' "$step" "$stacked" "$( ((nstacked == 1)) && echo s)" "$base"
     fi)
   failed_url=$(jq -r '[(.statusCheckRollup // [])[] | select((.conclusion // .state // "") | test("FAILURE|ERROR|TIMED_OUT|CANCELLED|ACTION_REQUIRED|STARTUP_FAILURE")) | (.detailsUrl // .targetUrl // empty)][0] // empty' <<<"$j")
   local say target after action

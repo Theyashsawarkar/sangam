@@ -2,6 +2,29 @@
 
 Newest first.
 
+## v2.4.0 -- 2026-11-03
+
+- **The approval popup now has everything its design shows.**
+  - A comment lists who gets notified (the author, the reviewers, anyone it
+    tags), and its text shows as GitHub shows it: headings without their `#`,
+    `code` and @tags marked.
+  - A review says "wants to request changes as you", shows "This review" and
+    when it replaces your earlier approval, and which author it notifies.
+  - A merge numbers what happens next ("1. main gets one new commit, 2. the
+    branch is deleted, 3. #143 retargets to main"); its method says how many
+    commits land.
+  - A merge that isn't ready says what's stopping it: each failed check with
+    when it failed ("l opens the log"), who a review waits for, conflicts.
+    For auto-merge, what happens if you approve ("when the check passes and
+    priya approves, GitHub merges it").
+  - Short labels ("not ready: 1 check failed", "moves 1 stacked PR").
+  - The answers as the design names them ("Edit first", "View the diff",
+    "Open on GitHub", "Open the failed log"), on two rows when one is too
+    narrow, with a hint at the right ("Enter does nothing here" for a merge).
+- **A moment after you answer**: "✓ Approved: it merges into main now",
+  "✗ Declined: nothing was done", or "Expired: no answer in 10 minutes", then
+  the popup closes. The agent has the answer already; it doesn't wait for this.
+
 ## v2.3.2 -- 2026-11-03
 
 - **An agent's server started before an update showed a broken popup** ("an

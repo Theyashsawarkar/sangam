@@ -573,9 +573,12 @@ pane when it runs in tmux, else the client you used last). It says in one
 sentence who wants what ("Claude Code wants to squash and merge into main"),
 then what you asked, then labels for what's at stake ("lands on main", "not
 ready: 1 check failed", "public on the PR"). The details sit beside the exact
-text or, for a merge, what's ready, the commits that land and what follows.
+text or, for a merge, what's ready, the commits that land and what follows,
+numbered. A merge that isn't ready says what's stopping it (each failed
+check, who a review waits for); a comment or review says who gets notified.
 The border turns red for a merge. It stays perfectly still while it waits.
-It counts down to the 10 minutes after which no answer is a no:
+It counts down to the 10 minutes after which no answer is a no, and after
+you answer says for a moment what that did:
 
 | Key | |
 |---|---|

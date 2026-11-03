@@ -34,7 +34,8 @@ screen() { t capture-pane -p -t o; }
 request show; open show 150 40
 s=$(screen)
 for want in "sangam · approve a merge" "acme/shop#142" "Claude Code wants to squash and merge into main" 'You asked: "merge the checkout fix"' \
-    "lands on main" "Ready to merge" "✓ Checks: 14 of 14 passed" "Fix rounding in the checkout total" "commit line 1" "Merge into main" "Decline" "is a no"; do
+    "lands on main" "Ready to merge" "✓ Checks: 14 of 14 passed" "Fix rounding in the checkout total" "commit line 1" "Merge into main" "Decline" "is a no" \
+    "View the diff" "Open on GitHub" "Enter does nothing here"; do
   grep -qF "$want" <<<"$s" || fail "missing: $want"
 done
 
@@ -70,6 +71,19 @@ answer() {  # answer <name> <keys...> -> the answer file
 [ -z "$(answer a4 Enter)" ] || fail "Enter answered"
 [ -z "$(answer a5 x)" ] || fail "x answered"
 
+# after the answer: a moment saying what it did (the answer is written first)
+result() {  # result <name> <keys> -> the screen just after
+  request "$1"; stop
+  t new -d -s o -x 100 -y 24 "env -u TMUX SANGAM_RESULT_SECS=3 SANGAM_ASK='$tmp/$1' bash '$here/bin/sangam' --approve-ui; sleep 30"
+  sleep 1.2; [ -n "$2" ] && t send-keys -t o "$2"; sleep .6; screen
+}
+s=$(result r1 y); grep -qF "✓ Approved" <<<"$s" && grep -qF "It merges into main now." <<<"$s" || fail "no Approved screen"
+s=$(result r2 n); grep -qF "✗ Declined" <<<"$s" && grep -qF "Claude Code has been told" <<<"$s" || fail "no Declined screen"
+request r3; echo $(($(date +%s) - 599)) >"$tmp/r3/since"; stop
+t new -d -s o -x 100 -y 24 "env -u TMUX SANGAM_RESULT_SECS=3 SANGAM_ASK='$tmp/r3' bash '$here/bin/sangam' --approve-ui; sleep 30"; sleep 2.2
+s=$(screen); grep -qF "Expired: no answer in 10 minutes" <<<"$s" && grep -qF "Counted as a no" <<<"$s" || fail "no Expired screen"
+[ "$(cat "$tmp/r3/answer" 2>/dev/null)" = no ] || fail "expiry isn't a no"
+
 # a key pressed as it opens (you were typing) doesn't answer
 request early; stop
 t new -d -s o -x 120 -y 30 "env -u TMUX SANGAM_ASK='$tmp/early' bash '$here/bin/sangam' --approve-ui; sleep 30"
@@ -85,6 +99,7 @@ sleep 1.2; t send-keys -t o e; sleep 1
 s=$(screen); grep -qF "edited by you" <<<"$s" || fail "no sign of the edit"
 grep -qF "my words" <<<"$s" || fail "the edit isn't shown"
 grep -qF "Undo my edit" <<<"$s" || fail "no undo offered"
+grep -qF "Edit again" <<<"$s" || fail "no Edit again after an edit"
 t send-keys -t o u; sleep .6
 s=$(screen); grep -qF "hello there" <<<"$s" || fail "u didn't undo"
 grep -qF "edited by you" <<<"$s" && fail "u left the label"
@@ -125,10 +140,12 @@ stop
 bin=$tmp/bin; mkdir -p "$bin"
 cat >"$tmp/pr.json" <<'JSON'
 {"title":"Fix search","state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"BLOCKED","reviewDecision":"REVIEW_REQUIRED",
- "statusCheckRollup":[{"name":"e2e","conclusion":"FAILURE","status":"COMPLETED","detailsUrl":"https://example.com/log"},{"name":"unit","conclusion":"SUCCESS","status":"COMPLETED"}],
+ "statusCheckRollup":[{"name":"results","workflowName":"e2e","conclusion":"FAILURE","status":"COMPLETED","completedAt":"COMPLETED_AT","detailsUrl":"https://example.com/log"},{"name":"unit","conclusion":"SUCCESS","status":"COMPLETED"}],
+ "reviewRequests":[{"login":"arjun"}],"latestReviews":[{"author":{"login":"sam"},"state":"APPROVED"}],
  "headRefName":"fix/search","baseRefName":"main","author":{"login":"priya"},"additions":12,"deletions":3,"changedFiles":2,"url":"https://example.com/pr/9",
  "commits":[{"oid":"a1f3c09aaaa","messageHeadline":"Rank exact matches first"}]}
 JSON
+sed -i "s/COMPLETED_AT/$(date -u -d '-6 min' +%FT%TZ)/" "$tmp/pr.json"
 cat >"$bin/gh" <<EOF
 #!/bin/sh
 case "\$1 \$2" in
@@ -170,22 +187,32 @@ for want in "first label" "last label" "last-row"; do grep -qF "$want" <<<"$s" |
 # the countdown stays clear of the border
 grep -q "is a no│" <<<"$s" && fail "the countdown runs into the border"
 seen "Auto-merge" kind; seen danger tone; seen "merge into" say; seen main target; seen "Turn on auto-merge" action
-seen "not ready: Checks: 1 failed, 1 passed" chips; seen "merges later" chips; seen "lands on main" chips; seen "deletes the branch" chips; seen "moves #10" chips
+seen "not ready: 1 check failed" chips; seen "merges later" chips; seen "lands on main" chips; seen "deletes the branch" chips; seen "moves 1 stacked PR" chips
 seen "Not ready yet" facts; seen "✗"$'\t'"Checks: 1 failed" facts; seen "○"$'\t'"Review: needs an approval" facts; seen "fix/search" facts
-seen "a1f3c09" frame; seen "✗ e2e" frame; seen "If you approve" frame; seen "https://example.com/log" log; seen "https://example.com/pr/9" url; seen "diff --git" diff
+seen "a1f3c09" frame; seen "✗ e2e / results" frame; seen "failed 6 minutes ago · l opens the log" frame; seen "Waiting for a review from arjun" frame
+seen "What happens if you approve" frame; seen "When the check passes and arjun approves, GitHub merges it into main" frame; seen "Method"$'\t'"squash, 1 commit into 1" facts; seen "https://example.com/log" log; seen "https://example.com/pr/9" url; seen "diff --git" diff
 
 echo yes >"$tmp/say"
 out=$(call pr_merge '{"pr":"acme/shop#9","method":"rebase"}')
 grep -q "Merged" <<<"$out" || fail "merge: $out"; grep -q -- "--rebase" "$tmp/gh-writes" || fail "not a rebase"
 seen "rebase and merge into" say; seen "Merge into main" action
+seen "1. main gets 1 new commit" frame; seen "2. #10 retargets to main" frame; seen "Review: needs an approval" facts
 
-out=$(call pr_comment '{"pr":"acme/shop#9","body":"Looks good"}')
+out=$(call pr_comment '{"pr":"acme/shop#9","body":"Looks good @dana-r"}')
 grep -q "Posted" <<<"$out" || fail "comment: $out"
 seen Comment kind; seen "Post the comment" action; seen "public on the PR" chips; seen "Looks good" text; seen "Fix search" facts
+seen "Who gets notified" facts; seen "P"$'\t'"priya"$'\t'"author" facts; seen "P"$'\t'"arjun"$'\t'"reviewer" facts; seen "P"$'\t'"dana-r"$'\t'"mentioned" facts
+seen "notifies 3 people" chips; grep -qP '^P\tsam\t' "$tmp/seen/facts" && fail "you are on the notified list"
+# and on screen: the people, and the text as GitHub shows it
+printf 'Claude Code' >"$tmp/seen/who"; printf '## Heading\nsee `x.go` @dana-r\n' >"$tmp/seen/text"; cp "$tmp/seen/text" "$tmp/seen/orig"; date +%s >"$tmp/seen/since"; rm -f "$tmp/seen/answer"
+stop; t new -d -s o -x 150 -y 40 "env -u TMUX SANGAM_ASK='$tmp/seen' bash '$here/bin/sangam' --approve-ui; sleep 30"; sleep 1.2; s=$(screen)
+for want in "wants to comment as sam" "· priya author" "· dana-r mentioned" "Edit first" "j/k scroll" "see x.go @dana-r"; do grep -qF "$want" <<<"$s" || fail "comment screen: missing $want"; done
+grep -qF "## Heading" <<<"$s" && fail "comment screen: shows the heading's #"
 
 out=$(call pr_review '{"pr":"acme/shop#9","event":"request_changes","body":"Please fix"}')
 grep -q "Review submitted" <<<"$out" || fail "review: $out"
-seen "request changes" say; seen "blocks the merge" chips; seen "diff --git" diff
+seen "request changes" target; seen " as sam" after; seen "blocks the merge" chips; seen "notifies priya" chips; seen "diff --git" diff
+seen "This review" facts; seen "Request changes" facts; seen "Replaces your earlier approval" facts
 
 [ "$fails" -eq 0 ] && echo "approve popup: ok"
 exit "$fails"
