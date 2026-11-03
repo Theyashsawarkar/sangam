@@ -1099,7 +1099,7 @@ run_main() {
 # keybind: Tmux/sangam approval | n / Esc | Cancel the agent's request (it's told you declined)
 # keybind: Tmux/sangam approval | e | Edit the agent's text before approving (in your editor)
 # keybind: Tmux/sangam approval | u | Undo your edit of the agent's text
-# keybind: Tmux/sangam approval | d | View the PR's diff before answering
+# keybind: Tmux/sangam approval | d | Show the PR's diff before answering
 # keybind: Tmux/sangam approval | l | Open the failed check's log in the browser
 # keybind: Tmux/sangam approval | b | Open the PR on GitHub in the browser
 # keybind: Tmux/sangam approval | j / k | Scroll the text in the approval popup
