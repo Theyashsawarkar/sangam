@@ -238,7 +238,7 @@ article h2:hover .anchor,article h3:hover .anchor{opacity:1;text-decoration:none
 article ul,article ol{padding-left:22px}article li{margin:5px 0}
 article img{border-radius:14px;border:1px solid rgba(255,255,255,.07)}
 article p[align=center]{text-align:center}article p[align=center] img{margin:6px 0}
-article blockquote{margin:22px 0;padding:14px 20px;border-left:3px solid var(--accent);background:rgba(255,255,255,.03);border-radius:0 12px 12px 0}
+article blockquote{margin:22px 0;padding:14px 20px;border-left:3px solid var(--accent);background:rgba(255,255,255,.03);border-radius:12px}
 article blockquote p{margin:0;color:var(--sub0);font-style:italic}
 pre.code{position:relative;background:var(--mantle);border:1px solid var(--s0);border-radius:14px;padding:16px 18px;overflow:auto;font:13.5px/1.6 var(--mono);color:var(--sub1)}
 pre.code code{background:none;border:0;padding:0;font-size:inherit;color:inherit}

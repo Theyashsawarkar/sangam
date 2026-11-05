@@ -2,6 +2,10 @@
 
 Newest first.
 
+## Unreleased
+
+- Every corner is rounded: the website's callouts.
+
 ## v2.4.2 -- 2026-11-04
 
 - `sangam --version` says the right version: v2.4.1 went out still saying 2.4.0.
