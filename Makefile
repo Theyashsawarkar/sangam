@@ -25,4 +25,5 @@ check: lint
 	bash -n bin/sangam
 	./bin/sangam --version
 	./bin/sangam --help >/dev/null
+	bash tests/keys.sh
 	if command -v tmux >/dev/null; then bash tests/approve.sh; fi

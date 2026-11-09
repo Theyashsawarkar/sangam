@@ -10,7 +10,7 @@
 #   sangam --help | --version
 #
 # Sections, like gh-dash: each is a GitHub search across all repos, run as
-# one of your gh accounts, listed in ~/.config/sangam/sections (E edits it):
+# one of your gh accounts, listed in ~/.config/sangam/sections (Space , e edits it):
 #   name | account | search            e.g.  Review requested | | review-requested:@me
 # An empty account means gh's active one. Started inside a GitHub repo, a
 # section for that repo is added too (its account: `git config github.user`).
@@ -21,36 +21,46 @@
 # Quitting fzf kills the server. As a tmux popup (sangam.tmux runs it with
 # --popup), the popup's key (prefix G) kills it too.
 #
-# Vim-style: it opens in normal mode (letters are commands); / filters the
-# list, Enter or Esc leaves the filter.
+# Vim-style: it opens in normal mode (letters are commands, typing changes
+# nothing) with Space as the leader; / filters the list, Enter or Esc leaves
+# the filter. After Space (or g) the footer shows the keys that can follow.
 #
 # keybind: Tmux/sangam | j / k | Move to the next / previous PR
-# keybind: Tmux/sangam | g / G | Jump to the first / last PR
-# keybind: Tmux/sangam | h / l | Switch to the previous / next section
+# keybind: Tmux/sangam | g g / G | Jump to the first / last PR
+# keybind: Tmux/sangam | H / L | Switch to the previous / next section (h / l work too)
 # keybind: Tmux/sangam | 1 / 2 / 3 / 4 | Show the overview / diff / checks / comments
 # keybind: Tmux/sangam | Tab | Cycle the preview (overview, diff, checks, comments)
 # keybind: Tmux/sangam | J / K | Scroll the preview down / up
 # keybind: Tmux/sangam | Ctrl+d / Ctrl+u | Scroll the preview half a page down / up
 # keybind: Tmux/sangam | Enter | Open the current view full screen (failed check logs in checks)
 # keybind: Tmux/sangam | / | Search PRs (Enter or Esc goes back to normal mode)
-# keybind: Tmux/sangam | f | Cycle the state shown (open, merged, closed, all)
-# keybind: Tmux/sangam | F | Toggle between open PRs and all of them
-# keybind: Tmux/sangam | u | Switch the account (all, then each signed-in gh account)
-# keybind: Tmux/sangam | s | Search GitHub within the section (author:x label:y...; empty clears)
-# keybind: Tmux/sangam | R | Reload PRs from GitHub
-# keybind: Tmux/sangam | S | Edit the sections: add, edit, delete, move, pin this repo
-# keybind: Tmux/sangam | E | Edit the sections file (then reloads)
-# keybind: Tmux/sangam | m | Merge the PR (squash, merge commit, rebase or auto-merge)
-# keybind: Tmux/sangam | a | Approve the PR (optional message)
-# keybind: Tmux/sangam | r | Request changes on the PR (message in your editor)
-# keybind: Tmux/sangam | c | Add a comment to the PR (in your editor)
-# keybind: Tmux/sangam | x | Close the PR (reopens a closed one)
-# keybind: Tmux/sangam | o | Switch this repo to the PR's branch (gh pr checkout; inside its clone)
-# keybind: Tmux/sangam | d | Toggle the PR between draft and ready for review
+# keybind: Tmux/sangam | r | Reload PRs from GitHub (R works too)
+# keybind: Tmux/sangam | o | Open the PR in the browser (b works too)
 # keybind: Tmux/sangam | y | Copy the PR's link
-# keybind: Tmux/sangam | b | Open the PR in the browser
 # keybind: Tmux/sangam | ? | Show all keys (a popup; any key closes it)
-# keybind: Tmux/sangam | q / Esc | Quit sangam
+# keybind: Tmux/sangam | q / Esc | Quit sangam (Esc first cancels a pending key)
+# keybind: Tmux/sangam | Space Space | Open the palette of every leader action (Enter runs it)
+# keybind: Tmux/sangam | Space p m | Merge the PR (squash, merge commit, rebase or auto-merge)
+# keybind: Tmux/sangam | Space p a | Approve the PR (optional message)
+# keybind: Tmux/sangam | Space p r | Request changes on the PR (message in your editor)
+# keybind: Tmux/sangam | Space p c | Add a comment to the PR (in your editor)
+# keybind: Tmux/sangam | Space p x | Close the PR (reopens a closed one)
+# keybind: Tmux/sangam | Space p d | Toggle the PR between draft and ready for review
+# keybind: Tmux/sangam | Space g b | Switch this repo to the PR's branch (gh pr checkout; inside its clone)
+# keybind: Tmux/sangam | Space g a | Switch the account (all, then each signed-in gh account)
+# keybind: Tmux/sangam | Space f f | Filter the list (as /)
+# keybind: Tmux/sangam | Space f s | Show the next state (cycles open, merged, closed, all)
+# keybind: Tmux/sangam | Space f a | Toggle between open PRs and all of them (F works too)
+# keybind: Tmux/sangam | Space f g | Search GitHub within the section (author:x label:y...; empty clears)
+# keybind: Tmux/sangam | Space f c | Clear the GitHub search
+# keybind: Tmux/sangam | Space t 1..9 | Switch to section 1..9
+# keybind: Tmux/sangam | Space y y | Copy the PR's link
+# keybind: Tmux/sangam | Space o b | Open the PR in the browser
+# keybind: Tmux/sangam | Space , s | Edit the sections: add, edit, delete, move, pin this repo (S works too)
+# keybind: Tmux/sangam | Space , e | Edit the sections file, then reload (E works too)
+# keybind: Tmux/sangam | Space r | Reload PRs from GitHub
+# keybind: Tmux/sangam | Space ? | Show all keys
+# keybind: Tmux/sangam | Space q | Quit sangam
 # keybind: Tmux/sangam | prefix G | Quit sangam (as a tmux popup: the popup's key toggles it)
 
 self=$(readlink -f "$0")
@@ -84,8 +94,7 @@ FZF_COLORS=${VARNA_FZF_COLORS:-"bg:-1,bg+:$(hex "$RGB_SEL"),fg:$FGH,fg+:$(hex "$
 FZF_COLORS+=",header:$DIMH,header-border:$LINEH,header-label:$DIMH"
 
 STATES=(open merged closed all)
-NORMAL_KEYS='j,k,g,G,h,l,J,K,1,2,3,4,f,F,u,s,S,R,E,m,a,r,c,x,o,d,y,b,q,/,?'
-VERSION=2.4.2
+VERSION=2.5.0
 CONFIG=${XDG_CONFIG_HOME:-$HOME/.config}/sangam/sections
 CROOT=${XDG_CACHE_HOME:-$HOME/.cache}/sangam
 # Sections from before the rename (tmux-gh-pr) carry over once.
@@ -142,7 +151,9 @@ build_sections() {
     printf '%s\t%s\t%s\n' "${HERE#*/} (here)" "$HERE_USER" "repo:$HERE" >>"$STATE/sections.tmp"
   fi
   local only; only=$(acct)
-  while IFS=$'\t' read -r n a q; do
+  # Tab is IFS whitespace: `read` would merge an empty account's two tabs.
+  while IFS= read -r line; do
+    n=${line%%$'\t'*} a=${line#*$'\t'}; q=${a#*$'\t'} a=${a%%$'\t'*}
     # A section with no account belongs to every account.
     if [ -n "$only" ] && [ -n "$a" ] && [ "${a,,}" != "${only,,}" ]; then continue; fi
     [ -n "$only" ] && [ -z "$a" ] && a=$only
@@ -613,15 +624,18 @@ sections_menu() {
 # with every key, grouped; any key closes it.
 keysheet() {
   local -a L=("${dim}MOVE${r}"
-    "  ${key}j / k${r}    next / previous PR" "  ${key}g / G${r}    first / last" "  ${key}h / l${r}    previous / next section"
-    "  ${key}/${r}        filter the list" "  ${key}s${r}        search GitHub" "  ${key}f${r}        open/merged/closed/all"
-    "  ${key}F${r}        open ↔ all" "  ${key}u${r}        switch account" "  ${key}R${r}        reload" "  ${key}S${r}        add/edit/move sections" "  ${key}E${r}        sections file")
-  local -a M=("${dim}READ${r}"
-    "  ${key}1${r} overview   ${key}2${r} diff" "  ${key}3${r} checks     ${key}4${r} comments" "  ${key}Tab${r}      next view"
-    "  ${key}J / K${r}    scroll preview" "  ${key}^d / ^u${r}  half a page" "  ${key}Enter${r}    full screen" "  ${key}b${r}        open in browser" "  ${key}y${r}        copy link")
-  local -a A=("${dim}ACT${r}"
-    "  ${key}m${r}  merge" "  ${key}a${r}  approve" "  ${key}r${r}  request changes" "  ${key}c${r}  comment" "  ${key}x${r}  close / reopen"
-    "  ${key}o${r}  checkout (in its clone)" "  ${key}d${r}  draft / ready" "  ${key}q${r}  quit${SANGAM_QUIT:+ (or $SANGAM_QUIT)}")
+    "  ${key}j / k${r}    next / previous PR" "  ${key}gg / G${r}   first / last" "  ${key}H / L${r}    previous / next section"
+    "  ${key}/${r}        filter the list" "  ${key}r${r}        reload" "  ${key}o${r}        open in browser" "  ${key}y${r}        copy link"
+    "" "${dim}READ${r}" "  ${key}1${r} overview   ${key}2${r} diff" "  ${key}3${r} checks     ${key}4${r} comments" "  ${key}Tab${r}      next view"
+    "  ${key}J / K${r}    scroll preview" "  ${key}^d / ^u${r}  half a page" "  ${key}Enter${r}    full screen" "  ${key}q${r}        quit${SANGAM_QUIT:+ (or $SANGAM_QUIT)}")
+  local -a M=("${dim}SPACE p · the PR${r}"
+    "  ${key}m${r}  merge" "  ${key}a${r}  approve" "  ${key}r${r}  request changes" "  ${key}c${r}  comment" "  ${key}x${r}  close / reopen" "  ${key}d${r}  draft / ready"
+    "" "${dim}SPACE g · go to${r}" "  ${key}b${r}  check out the branch" "  ${key}a${r}  switch account"
+    "" "${dim}SPACE${r}" "  ${key}Space${r}  palette" "  ${key}t 1..9${r} section N" "  ${key}y y${r}  copy · ${key}o b${r} browser")
+  local -a A=("${dim}SPACE f · filter${r}"
+    "  ${key}f${r}  filter the list" "  ${key}s${r}  open/merged/closed/all" "  ${key}a${r}  open ↔ all" "  ${key}g${r}  search GitHub" "  ${key}c${r}  clear the search"
+    "" "${dim}SPACE , · sections${r}" "  ${key}s${r}  add/edit/move sections" "  ${key}e${r}  sections file"
+    "" "${dim}MOVED IN 2.5${r}" "  m a c x d → ${key}Space p${r} …" "  o checkout → ${key}Space g b${r}" "  u → ${key}Space g a${r} · s f → ${key}Space f${r}")
   local cw=36 i n=${#L[@]} top
   ((${#M[@]} > n)) && n=${#M[@]}; ((${#A[@]} > n)) && n=${#A[@]}
   plainlen() { local x; x=$(sed 's/\x1b\[[0-9;]*m//g' <<<"$1"); echo ${#x}; }
@@ -714,7 +728,7 @@ compose() {
 # keybind: Tmux/sangam merge panel | ! | Merge anyway as admin (bypass the branch rules)
 # keybind: Tmux/sangam merge panel | d | Set the draft ready for review
 # keybind: Tmux/sangam merge panel | o | Switch this repo to the PR's branch to resolve conflicts
-# keybind: Tmux/sangam merge panel | q / Esc | Close the merge panel
+# keybind: Tmux/sangam merge panel | q / Esc | Close the merge panel (each merge then asks: y merges, any other key cancels)
 spin() {  # spin <message> <command...>: run it with a spinner, keep its output in $OUT
   local f; f=$(mktemp); "${@:2}" >"$f" 2>&1 & local pid=$! i=0 c='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
   while kill -0 "$pid" 2>/dev/null; do printf '\r  %s%s%s %s' "$gold" "${c:i++%10:1}" "$r" "$1"; read -rt 0.1 <> <(:) 2>/dev/null || true; done
@@ -843,12 +857,12 @@ merge_now() {  # merge_now n how admin title head base cross autodel
     read -re -i "$title (#$n)" subject || return 1
   fi
   if [ "$cross" = false ] && [ "$autodel" != true ]; then
-    k=$(ask "  Delete ${blue}$head${r} on GitHub afterwards? ${key}Y${r}/n ")
-    [ "$k" = n ] || [ "$k" = N ] || del=y
+    k=$(ask "  Delete ${blue}$head${r} on GitHub afterwards? ${key}y${r} deletes, any other key keeps it ")
+    [ "$k" = y ] && del=y
   fi
   local verb; case $how in --squash) verb="Squash-merge" ;; --merge) verb="Merge" ;; *) verb="Rebase-merge" ;; esac
-  k=$(ask "  $verb #$n into ${blue}$base${r}${admin:+ ${red}as admin${r}}$([ "$del" = y ] && echo ", delete $head")? ${key}Enter${r} merges, Esc cancels ")
-  [ -z "$k" ] || return 1
+  k=$(ask "  $verb #$n into ${blue}$base${r}${admin:+ ${red}as admin${r}}$([ "$del" = y ] && echo ", delete $head")? ${key}y${r} merges, any other key cancels ")
+  [ "$k" = y ] || return 1
   # -R and no --delete-branch: gh then leaves the local checkout alone.
   if spin "merging…" gh pr merge "$n" -R "$REPO" $how $admin ${subject:+--subject "$subject"}; then
     [ "$del" = y ] && gh api -X DELETE "repos/$REPO/git/refs/heads/$head" >/dev/null 2>&1
@@ -891,13 +905,13 @@ action() {
       header "$n"
       case $state in
         OPEN)
-          [ "$(ask "  Close this PR without merging? y/${key}N${r} ")" = y ] || return
+          [ "$(ask "  Close this PR without merging? ${key}y${r} closes, any other key cancels ")" = y ] || return
           printf '  Optional closing comment (Enter to skip):\n  %s❯%s ' "$rose" "$r"
           local msg; read -re msg || return
           if out=$(gh pr close "$n" -R "$REPO" ${msg:+--comment "$msg"} 2>&1); then notify "$n" "Closed: $title"
           else echo "${red}$out${r}"; pause; fi ;;
         CLOSED)
-          [ "$(ask "  Reopen this PR? y/${key}N${r} ")" = y ] || return
+          [ "$(ask "  Reopen this PR? ${key}y${r} reopens, any other key cancels ")" = y ] || return
           if out=$(gh pr reopen "$n" -R "$REPO" 2>&1); then notify "$n" "Reopened: $title"
           else echo "${red}$out${r}"; pause; fi ;;
         *) echo "  Merged PRs can't be closed or reopened."; pause ;;
@@ -905,7 +919,7 @@ action() {
     checkout)
       header "$n"
       [ "$HERE" = "$REPO" ] || { echo "  Checkout works inside a clone of $REPO; this popup was opened in ${HERE:-a folder outside any GitHub repo}."; pause; return; }
-      [ "$(ask "  Switch $(basename "$PWD") to this PR's branch? y/${key}N${r} ")" = y ] || return
+      [ "$(ask "  Switch $(basename "$PWD") to this PR's branch? ${key}y${r} switches, any other key cancels ")" = y ] || return
       if out=$(gh pr checkout "$n" -R "$REPO" 2>&1); then echo "${green}$out${r}"; notify "$n" "Checked out: $title"; sleep 0.8
       else echo "${red}$out${r}"; pause; fi ;;
     draft)
@@ -1044,15 +1058,167 @@ doctor() {
   return $bad
 }
 
+# ------------------------------------------------------------------ keys
+# Normal mode is vim-like with Space as the leader (the same groups as every
+# Vayu tool: p PR, g go to, f filter, t sections, y copy, o open, , settings).
+# fzf has no key sequences, so every key but the moving ones runs
+# `sangam --key` (fzf's transform): it reads what is pending (g, Space,
+# Space p...) from $STATE/pending, answers with fzf actions, and shows the
+# next keys (which-key) in fzf's footer. While a key is pending the moving
+# keys are unbound, so Esc or any other key is the only way on.
+MOVE_KEYS='j,k,J,K,G,ctrl-d,ctrl-u,tab'
+DISP_KEYS=(g h l H L 1 2 3 4 5 6 7 8 9 f F u s S R E m a r c x o d y b q '?' p t e i n v w z space ',')
+NORMAL_KEYS="$MOVE_KEYS,$(IFS=,; echo "${DISP_KEYS[*]}"),/"
+# What each leader key does, for the which-key footer and the Space Space
+# palette: "<keys>|<what>".
+LEADER_MAP=(
+  "Space p m|Merge the PR (merge panel)" "Space p a|Approve the PR" "Space p r|Request changes on the PR"
+  "Space p c|Comment on the PR" "Space p x|Close or reopen the PR" "Space p d|Toggle draft / ready for review"
+  "Space g b|Check out the PR's branch (in its clone)" "Space g a|Switch the account"
+  "Space f f|Filter the list" "Space f s|Cycle the state (open, merged, closed, all)" "Space f a|Toggle open ↔ all"
+  "Space f g|Search GitHub within the section" "Space f c|Clear the GitHub search"
+  "Space t 1..9|Go to section N" "Space y y|Copy the PR's link" "Space o b|Open the PR in the browser"
+  "Space , s|Edit the sections (menu)" "Space , e|Edit the sections file"
+  "Space r|Reload PRs from GitHub" "Space ?|Show every key" "Space q|Quit sangam")
+# The keys that changed in 2.5.0 say where they went, for one release.
+declare -A MOVED=([m]="merge → Space p m" [a]="approve → Space p a" [c]="comment → Space p c"
+  [x]="close → Space p x" [d]="draft → Space p d" [u]="account → Space g a" [s]="GitHub search → Space f g"
+  [f]="state → Space f s" [r]="request changes → Space p r · r reloads now" [o]="checkout → Space g b · o opens the browser now")
+
+# whichkey <title> <key> <label> ...: the footer for a pending key, wrapped
+# to the list's width (fzf's preview takes the right 42%).
+whichkey() {
+  local t=$1 w line plain item ip out=""; shift
+  w=$(( ${FZF_COLUMNS:-120} * 58 / 100 - 8 )); ((w < 30)) && w=30
+  line="${rose}$t ›${r}" plain="$t ›"
+  set -- "$@" Esc cancel
+  while (($# >= 2)); do
+    if [ "$1" = Esc ]; then item="  ${dim}Esc cancel${r}"; else item="  ${key}$1${r} $2"; fi
+    ip="  $1 $2"
+    if (( ${#plain} + ${#ip} > w )); then out+="$line"$'\n'; line="${item#  }" plain="${ip#  }"
+    else line+=$item plain+=$ip; fi
+    shift 2
+  done
+  printf '%s%s' "$out" "$line"
+}
+
+# keypress <key>: sets ACT (fzf actions) and FOOT (footer text), and moves
+# $STATE/pending on. Used by --key (one key) and --replay (a palette pick).
+keypress() {
+  local k=$1 p next="" act="" foot=""
+  p=$(cat "$STATE/pending" 2>/dev/null)
+  local list="reload-sync($self --list --cached)"
+  local pv="refresh-preview+transform-preview-label($self --plabel {1})"
+  local reload="execute-silent(rm -f \"\$STATE\"/prefetched-*)+reload-sync($self --reload)+refresh-preview"
+  local web="execute-silent(setsid -f $self --web {1} >/dev/null 2>&1)"
+  local filter="show-input+unbind($NORMAL_KEYS)"
+  pr() { act="execute($self --action $1 {1})+reload-sync($self --reload)+refresh-preview"; }
+  case $k in
+    esc)
+      if [ "${FZF_INPUT_STATE:-}" = enabled ]; then act="hide-input+rebind($NORMAL_KEYS)"
+      elif [ -z "$p" ]; then act=abort; fi ;;
+    enter)
+      if [ "${FZF_INPUT_STATE:-}" = enabled ]; then act="hide-input+rebind($NORMAL_KEYS)"
+      elif [ -z "$p" ]; then act="execute($self --full {1})"; fi ;;
+    *)
+      case $p in
+        "")
+          case $k in
+            g) next=g foot=$(whichkey g g "first PR") ;;
+            space) next=space foot=$(whichkey Space p "PR…" g "go to…" f "filter…" t "section…" y "copy…" o "open…" , "sections…" \
+              r reload Space palette '?' keys q quit) ;;
+            h | H) act="execute-silent($self --section -1)+$list+first" ;;
+            l | L) act="execute-silent($self --section 1)+$list+first" ;;
+            1) act="execute-silent($self --mode overview)+$pv" ;;
+            2) act="execute-silent($self --mode diff)+$pv" ;;
+            3) act="execute-silent($self --mode checks)+$pv" ;;
+            4) act="execute-silent($self --mode comments)+$pv" ;;
+            R) act=$reload ;;
+            r) act=$reload foot="${dim}moved: ${MOVED[r]}$r" ;;
+            b) act=$web ;;
+            o) act=$web foot="${dim}moved: ${MOVED[o]}$r" ;;
+            y) act="execute-silent($self --copy {1})" ;;
+            F) act="execute-silent($self --toggle-all)+$list" ;;
+            S) act="execute($self --sections-menu)+$list+first" ;;
+            E) act="execute($self --edit)+$list" ;;
+            q) act=abort ;;
+            '?') act="execute-silent($self --show-keys)" ;;
+            m | a | c | x | d | u | s | f) foot="${dim}moved: ${MOVED[$k]}$r" ;;
+          esac ;;
+        g) [ "$k" = g ] && act=first ;;
+        space)
+          case $k in
+            p) next="space p" foot=$(whichkey "Space p" m merge a approve r "request changes" c comment x "close/reopen" d "draft/ready") ;;
+            g) next="space g" foot=$(whichkey "Space g" b "check out the branch" a account) ;;
+            f) next="space f" foot=$(whichkey "Space f" f "filter the list" s state a "open ↔ all" g "search GitHub" c "clear the search") ;;
+            t) next="space t" foot=$(whichkey "Space t" 1..9 "go to section N") ;;
+            y) next="space y" foot=$(whichkey "Space y" y "the PR's link") ;;
+            o) next="space o" foot=$(whichkey "Space o" b "the PR in the browser") ;;
+            ,) next="space ," foot=$(whichkey "Space ," s "sections menu" e "sections file") ;;
+            r) act=$reload ;;
+            q) act=abort ;;
+            '?') act="execute-silent($self --show-keys)" ;;
+            space) act="execute($self --palette)+transform($self --replay)" ;;
+          esac ;;
+        "space p")
+          case $k in m) pr merge ;; a) pr approve ;; r) pr request ;; c) pr comment ;; x) pr close ;; d) pr draft ;; esac ;;
+        "space g")
+          case $k in
+            b) pr checkout ;;
+            a) act="execute-silent($self --next-acct)+$list+first" ;;
+          esac ;;
+        "space f")
+          case $k in
+            f) act=$filter ;;
+            s) act="execute-silent($self --next-state)+$list" ;;
+            a) act="execute-silent($self --toggle-all)+$list" ;;
+            g) act="execute($self --search)+$list+first" ;;
+            c) act="execute-silent($self --clear-search)+$list+first" ;;
+          esac ;;
+        "space t") [[ $k == [1-9] ]] && act="execute-silent($self --section-to $k)+$list+first" ;;
+        "space y") [ "$k" = y ] && act="execute-silent($self --copy {1})" ;;
+        "space o") [ "$k" = b ] && act=$web ;;
+        "space ,")
+          case $k in
+            s) act="execute($self --sections-menu)+$list+first" ;;
+            e) act="execute($self --edit)+$list" ;;
+          esac ;;
+      esac ;;
+  esac
+  # Leaving a pending key gives the moving keys back; entering one takes them.
+  if [ -n "$p" ] && [ -z "$next" ]; then act="rebind($MOVE_KEYS)${act:++$act}"; fi
+  if [ -z "$p" ] && [ -n "$next" ]; then act="unbind($MOVE_KEYS)${act:++$act}"; fi
+  if [ -n "$next" ]; then printf '%s' "$next" >"$STATE/pending"; else rm -f "$STATE/pending"; fi
+  ACT=$act FOOT=$foot
+}
+
+# keyactions <key>...: the fzf actions for a run of keys; change-footer
+# comes last (it takes the rest of the line).
+keyactions() {
+  local all="" k
+  for k in "$@"; do keypress "$k"; [ -n "$ACT" ] && all+="${all:++}$ACT"; done
+  printf '%s' "${all:+$all+}change-footer:$FOOT"
+}
+
+# Space Space: every leader key, fuzzy; the pick is replayed as keys.
+palette() {
+  local pick
+  pick=$(for e in "${LEADER_MAP[@]}"; do
+      [[ ${e%%|*} == *..* ]] && continue
+      printf '%s\t%s%s%s\n' "${e%%|*}" "$fg" "${e#*|}" "$r"
+    done | SHELL=bash fzf --ansi --delimiter '\t' --nth 2,1 --layout reverse --info hidden --no-separator \
+      --prompt '  ' --pointer '▌' --gutter ' ' --input-border rounded --input-label ' palette (Enter runs, Esc closes) ' \
+      --input-label-pos 3 --list-border rounded --color "$FZF_COLORS") || true
+  printf '%s' "${pick%%$'\t'*}" >"$STATE/replay"
+}
+
 # --main: the list and preview; quitting ends sangam (and the popup).
 run_main() {
   # Quitting fzf ends sangam: its private tmux server goes with it.
   trap 'tmux kill-server 2>/dev/null' EXIT
-  normal="hide-input+rebind($NORMAL_KEYS)"
-  # esc/enter use transform:CMD (to the end of the binding), not transform(CMD):
-  # fzf ends the latter at the first ")", which is inside rebind(...).
-  act() { echo "execute($self --action $1 {1})+reload-sync($self --reload)+refresh-preview"; }
-
+  rm -f "$STATE/pending"
+  local -a disp=()
+  for k in "${DISP_KEYS[@]}"; do disp+=(--bind "$k:transform:$self --key"); done
   # Cached list first (instant), the fresh one replaces it once fetched.
   "$self" --list --cached | SHELL=bash fzf --ansi --delimiter '\t' --with-nth 2.. \
     --no-input --no-hscroll --layout reverse --info hidden --no-separator --no-scrollbar --highlight-line \
@@ -1062,29 +1228,13 @@ run_main() {
     --preview "$self --preview {1}" --preview-window 'right,42%,border-rounded,nowrap' --preview-label-pos 3 \
     --bind "load:transform($self --on-load)" \
     --bind "focus:transform-preview-label($self --plabel {1})" \
-    --bind "j:down,k:up,g:first,G:last,J:preview-down,K:preview-up,ctrl-d:preview-half-page-down,ctrl-u:preview-half-page-up" \
-    --bind "1:execute-silent($self --mode overview)+refresh-preview+transform-preview-label($self --plabel {1})" \
-    --bind "2:execute-silent($self --mode diff)+refresh-preview+transform-preview-label($self --plabel {1})" \
-    --bind "3:execute-silent($self --mode checks)+refresh-preview+transform-preview-label($self --plabel {1})" \
-    --bind "4:execute-silent($self --mode comments)+refresh-preview+transform-preview-label($self --plabel {1})" \
+    --footer-border rounded \
+    --bind "j:down,k:up,G:last,J:preview-down,K:preview-up,ctrl-d:preview-half-page-down,ctrl-u:preview-half-page-up" \
     --bind "tab:execute-silent($self --next-mode)+refresh-preview+transform-preview-label($self --plabel {1})" \
-    --bind "f:execute-silent($self --next-state)+reload-sync($self --list --cached)" \
-    --bind "F:execute-silent($self --toggle-all)+reload-sync($self --list --cached)" \
-    --bind "u:execute-silent($self --next-acct)+reload-sync($self --list --cached)+first" \
-    --bind "s:execute($self --search)+reload-sync($self --list --cached)+first" \
-    --bind "h:execute-silent($self --section -1)+reload-sync($self --list --cached)+first" \
-    --bind "l:execute-silent($self --section 1)+reload-sync($self --list --cached)+first" \
-    --bind "E:execute($self --edit)+reload-sync($self --list --cached)" \
-    --bind "S:execute($self --sections-menu)+reload-sync($self --list --cached)+first" \
-    --bind "R:execute-silent(rm -f \"\$STATE\"/prefetched-*)+reload-sync($self --reload)+refresh-preview" \
-    --bind "m:$(act merge),a:$(act approve),r:$(act request),c:$(act comment),x:$(act close),o:$(act checkout),d:$(act draft)" \
-    --bind "y:execute-silent($self --copy {1})" \
-    --bind "b:execute-silent(setsid -f $self --web {1} >/dev/null 2>&1)" \
-    --bind "q:abort" \
-    --bind "?:execute-silent($self --show-keys)" \
+    "${disp[@]}" \
     --bind "/:show-input+unbind($NORMAL_KEYS)" \
-    --bind "esc:transform:[ \"\$FZF_INPUT_STATE\" = enabled ] && echo '$normal' || echo abort" \
-    --bind "enter:transform:[ \"\$FZF_INPUT_STATE\" = enabled ] && echo '$normal' || echo \"execute($self --full {1})\"" \
+    --bind "esc:transform:$self --key" \
+    --bind "enter:transform:$self --key" \
     --color "$FZF_COLORS" >/dev/null
 }
 
@@ -1095,7 +1245,7 @@ run_main() {
 # yes in a popup (tmux, else a desktop notification), where you can also
 # edit the text first.
 #
-# keybind: Tmux/sangam approval | y | Approve the agent's request (comment, review or merge)
+# keybind: Tmux/sangam approval | y | Approve the agent's request (comment, review or merge; only y says yes)
 # keybind: Tmux/sangam approval | n / Esc | Cancel the agent's request (it's told you declined)
 # keybind: Tmux/sangam approval | e | Edit the agent's text before approving (in your editor)
 # keybind: Tmux/sangam approval | u | Undo your edit of the agent's text
@@ -1404,8 +1554,8 @@ chip() {
   esac
 }
 
-# action <key> <what> [go|stop]: an answer, its key then what it does
-action() {
+# answer_chip <key> <what> [go|stop]: an answer, its key then what it does
+answer_chip() {
   case ${3:-} in
     go) printf '\e[48;2;%sm\e[38;2;%sm\e[1m %s  %s \e[0m' "$RGB_GREEN" "$RGB_INK" "$1" "$2" ;;
     danger) printf '\e[48;2;%sm\e[38;2;%sm\e[1m %s  %s \e[0m' "$RGB_RED" "$RGB_INK" "$1" "$2" ;;
@@ -1480,15 +1630,15 @@ approve_draw() {
   local foot=$((H - 1)) edited=0 hint="j/k scroll" acts=() a w1=0
   [ -f "$d/text" ] && ! cmp -s "$d/text" "$d/orig" && edited=1
   case $(cat "$d/kind") in Merge | Auto-merge) hint="Enter does nothing here" ;; esac
-  if ((edited)); then acts+=("$(action y "$(cat "$d/action") (my version)" go)")
-  elif [ "$(cat "$d/tone")" = danger ]; then acts+=("$(action y "$(cat "$d/action")" danger)")
-  else acts+=("$(action y "$(cat "$d/action")" go)"); fi
-  [ -f "$d/text" ] && acts+=("$(action e "$( ((edited)) && echo "Edit again" || echo "Edit first")")")
-  ((edited)) && acts+=("$(action u "Undo my edit")")
-  acts+=("$(action n Decline stop)")
-  [ -s "$d/log" ] && acts+=("$(action l "Open the failed log")")
-  [ -s "$d/diff" ] && acts+=("$(action d "View the diff")")
-  [ -s "$d/url" ] && acts+=("$(action b "Open on GitHub")")
+  if ((edited)); then acts+=("$(answer_chip y "$(cat "$d/action") (my version)" go)")
+  elif [ "$(cat "$d/tone")" = danger ]; then acts+=("$(answer_chip y "$(cat "$d/action")" danger)")
+  else acts+=("$(answer_chip y "$(cat "$d/action")" go)"); fi
+  [ -f "$d/text" ] && acts+=("$(answer_chip e "$( ((edited)) && echo "Edit again" || echo "Edit first")")")
+  ((edited)) && acts+=("$(answer_chip u "Undo my edit")")
+  acts+=("$(answer_chip n Decline stop)")
+  [ -s "$d/log" ] && acts+=("$(answer_chip l "Open the failed log")")
+  [ -s "$d/diff" ] && acts+=("$(answer_chip d "View the diff")")
+  [ -s "$d/url" ] && acts+=("$(answer_chip b "Open on GitHub")")
   ACTIONS="" ACTIONS2=""
   for a in "${acts[@]}"; do
     w1=$((w1 + $(vis_len "$a") + 2))
@@ -1678,7 +1828,7 @@ approve_ui() {
     fi
     k=""; IFS= read -rsn1 -t 1 k || continue
     case $k in
-      y | Y) echo yes >"$d/answer"; approve_result yes "$d"; return ;;
+      y) echo yes >"$d/answer"; approve_result yes "$d"; return ;;
       n | N | q | $'\e') echo no >"$d/answer"; approve_result no "$d"; return ;;
       j) SCROLL=$((SCROLL + 1)); approve_frame ;;
       k) SCROLL=$((SCROLL - 1)); approve_frame ;;
@@ -2016,7 +2166,7 @@ case $1 in
   --strip) strip; exit ;;
   --main) run_main; exit ;;
   --show-keys)
-    tmux display-popup -E -w 116 -h 15 -b rounded -S "fg=$HI" -T "#[fg=$HI] keys #[fg=$DIMH]· any key closes " \
+    tmux display-popup -E -w 116 -h 20 -b rounded -S "fg=$HI" -T "#[fg=$HI] keys #[fg=$DIMH]· any key closes " \
       "STATE='$STATE' '$self' --keys"; exit ;;
   --toggle-all)
     if [ "$(state)" = all ]; then echo open >"$STATE/state"; else echo all >"$STATE/state"; fi
@@ -2033,6 +2183,13 @@ case $1 in
       "$dim" "$gold" "$(secf "$(sec)" 1)" "$r" "$dim" "$r" "$rose" "$r"
     read -re -i "$(query)" q || exit
     printf '%s' "$q" >"$STATE/query"; rm -f "$STATE/fresh"; exit ;;
+  --key) keyactions "$FZF_KEY"; exit ;;
+  --replay) read -ra ks <"$STATE/replay" 2>/dev/null; rm -f "$STATE/replay"; ((${#ks[@]})) && keyactions "${ks[@],,}"; exit ;;
+  --palette) palette; exit ;;
+  --section-to)
+    (($2 >= 1 && $2 <= $(nsec))) || exit
+    echo $(($2 - 1)) >"$STATE/sec"; rm -f "$STATE/fresh"; secf "$(sec)" 1 >"$CROOT/last-section"; exit ;;
+  --clear-search) rm -f "$STATE/query" "$STATE/fresh"; exit ;;
   --mode) echo "$2" >"$STATE/mode"; exit ;;
   --next-mode)
     case $(mode) in overview) m='diff' ;; diff) m='checks' ;; checks) m='comments' ;; *) m='overview' ;; esac

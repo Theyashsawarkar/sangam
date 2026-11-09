@@ -2,8 +2,34 @@
 
 Newest first.
 
-## Unreleased
+## v2.5.0 -- 2026-11-09
 
+- **Vim keys with `Space` as the leader**, grouped like every Vayu tool:
+  `Space p` the PR (`m` merge, `a` approve, `r` request changes, `c`
+  comment, `x` close, `d` draft), `Space g` go to (`b` check out the
+  branch, `a` account), `Space f` filter (`f` the list, `s` state, `a`
+  open ↔ all, `g` search GitHub, `c` clear it), `Space t 1..9` sections,
+  `Space y y` copy, `Space o b` browser, `Space ,` sections (`s` menu, `e`
+  file), `Space r` reload, `Space ?` keys, `Space q` quit.
+  - After `Space` (or `g`) a footer shows the keys that can follow
+    (which-key); `Esc` cancels.
+  - `Space Space` opens a palette of every leader action.
+  - `gg` goes to the first PR (a single `g` used to), `H` / `L` switch
+    sections (`h` / `l` still do), `r` reloads (`R` still does), `o`
+    opens the browser (`b` still does).
+  - **Moved:** `m` `a` `c` `x` `d` `u` `s` `f` and the old `r` / `o`. For
+    this release, an old key does nothing and the footer says where it
+    went.
+- **Confirming is `y` everywhere:** merging asks "`y` merges, any other key
+  cancels" (it was `Enter`), deleting the branch afterwards is `y` (it was
+  the default), closing, reopening and checking out take `y`, and the
+  agent approval popup no longer takes `Y`.
+- `tests/keys.sh` checks what every key and prefix does; `make check` runs it.
+- **Fixed:** since 2.3.0 the PR actions (merge, approve, request changes,
+  comment, close, checkout, draft) did nothing: the approval popup's own
+  `action` helper replaced them. It is `answer_chip` now.
+- **Fixed:** a section with an empty account (`Mine | | author:@me`, as
+  the default file has) lost its search and used it as the account.
 - Every corner is rounded: the website's callouts.
 
 ## v2.4.2 -- 2026-11-04

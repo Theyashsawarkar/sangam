@@ -355,10 +355,10 @@ Useful searches:
 | Bots | `org:acme author:app/dependabot` |
 | Busy discussions | `involves:@me comments:>10` |
 
-**Managing sections from inside sangam:** press `S` for a menu to **add**
+**Managing sections from inside sangam:** press `Space , s` (or `S`) for a menu to **add**
 a section (name, account picked from your signed-in ones, search),
 **edit** or **delete** the current one, move it **left** or **right**, or
-**pin** the repo you're in as a permanent section. `E` opens the file in
+**pin** the repo you're in as a permanent section. `Space , e` (or `E`) opens the file in
 your editor instead. Either way, sangam reloads right after.
 
 **The "here" tab:** started inside a clone of a GitHub repo, sangam adds a
@@ -367,7 +367,7 @@ that repo), run as the folder's account (`git config github.user`, see
 below). sangam remembers the section you were on last.
 
 **How many PRs:** each section shows up to 50 PRs, newest activity first.
-Narrow it with `s` or a more specific search to reach older ones.
+Narrow it with `Space f g` or a more specific search to reach older ones.
 
 ### Accounts
 
@@ -375,7 +375,7 @@ sangam works with every account `gh` is signed in to (`gh auth status`):
 
 - A section with an account runs its search as that account. A section
   without one runs as gh's active account, so it follows `gh auth switch`.
-- `u` focuses on one account: it cycles **all accounts → each account →
+- `Space g a` focuses on one account: it cycles **all accounts → each account →
   all**. Focused on one, you see its sections plus the account-less ones
   run as it. The choice is remembered across runs (as long as that account
   is still signed in), and shown at the top right.
@@ -395,13 +395,13 @@ sangam works with every account `gh` is signed in to (`gh auth status`):
 
 - `/` filters the list as you type, fuzzy, over what's on screen (number,
   title, author). `Enter` or `Esc` goes back to normal mode.
-- `s` searches GitHub within the current section: anything GitHub search
+- `Space f g` searches GitHub within the current section: anything GitHub search
   takes, such as `author:alice`, `label:bug`, `head:feature/x` or words
   from the title. It's added to the section's own search and shown at the
-  top right. An empty search clears it. It lasts until you quit.
-- `f` cycles the state for every section: **open → merged → closed →
-  all**. `F` jumps between open and all.
-- `R` reloads everything from GitHub (sangam also refreshes on its own
+  top right. An empty search (or `Space f c`) clears it. It lasts until you quit.
+- `Space f s` cycles the state for every section: **open → merged → closed →
+  all**. `Space f a` (or `F`) jumps between open and all.
+- `r` (or `R`) reloads everything from GitHub (sangam also refreshes on its own
   whenever you open it or change section, state, account or search).
 
 ### Reading a PR
@@ -427,18 +427,20 @@ sangam works with every account `gh` is signed in to (`gh auth status`):
   oldest first) and the review comments on the code, grouped by file and
   line, replies marked.
 - **`Enter`** opens the current view full screen in `less` (`q` returns).
-- **`b`** opens the PR in your browser; **`y`** copies its link.
+- **`o`** (or `b`) opens the PR in your browser; **`y`** copies its link.
 
 ### Reviewing
 
+These are under the leader, `Space p` (the PR):
+
 | Key | What happens |
 |---|---|
-| `a` | **Approve**, with an optional one-line message (`Enter` approves, `Ctrl+c` cancels) |
-| `r` | **Request changes**: your `$EDITOR` opens; write the review above the marker line and save. Leave it empty to cancel. |
-| `c` | **Comment** on the PR, in your editor the same way |
-| `x` | **Close** the PR without merging (asks first, optional closing comment); on a closed PR, **reopen** it |
-| `d` | Toggle between **draft** and **ready for review** |
-| `o` | **Check out** the PR's branch (`gh pr checkout`): only inside a clone of the PR's repo, asks first |
+| `Space p a` | **Approve**, with an optional one-line message (`Enter` approves, `Ctrl+c` cancels) |
+| `Space p r` | **Request changes**: your `$EDITOR` opens; write the review above the marker line and save. Leave it empty to cancel. |
+| `Space p c` | **Comment** on the PR, in your editor the same way |
+| `Space p x` | **Close** the PR without merging (`y` closes, any other key cancels; optional closing comment); on a closed PR, **reopen** it |
+| `Space p d` | Toggle between **draft** and **ready for review** |
+| `Space g b` | **Check out** the PR's branch (`gh pr checkout`): only inside a clone of the PR's repo; `y` switches, any other key cancels |
 
 After each action the PR is re-read from GitHub, and you get a desktop
 notification if `notify-send` is installed.
@@ -449,7 +451,7 @@ notification if `notify-send` is installed.
   <img alt="The merge panel: readiness checklist, commits that land, and the merge options the repo allows" src="assets/screenshots/merge.png" width="100%">
 </p>
 
-`m` opens the merge panel for the selected PR. It reads the PR and the
+`Space p m` opens the merge panel for the selected PR. It reads the PR and the
 repo's merge settings fresh, then shows:
 
 1. **Readiness:** checks, review, conflicts, whether the branch is up to
@@ -471,56 +473,69 @@ repo's merge settings fresh, then shows:
 
 Before merging, sangam asks whether to delete the branch on GitHub
 afterwards (unless the repo already does that, or the PR comes from a
-fork), then confirms once: `Enter` merges, `Esc` cancels. Your local
+fork), then confirms once: `y` merges, any other key cancels (deleting the branch is `y` too). Your local
 checkout is never touched. The panel re-reads the PR after each step, so
 "update branch → enable auto-merge" works in one sitting.
 
 ## Keys
 
-sangam opens in **normal mode**: letters are commands. `/` switches to
-typing a filter; `Enter` or `Esc` switches back.
+sangam opens in **normal mode**: letters are commands, and typing changes
+nothing. `/` switches to typing a filter; `Enter` or `Esc` switches back.
+**`Space` is the leader**: after it (or `g`) a footer shows the keys that
+can follow, grouped the way every Vayu tool groups them (`p` the PR, `g` go
+to, `f` filter, `t` sections, `y` copy, `o` open, `,` settings). `Esc`
+cancels. `Space Space` opens a palette of every leader action.
 
-**Move and find**
+**Move and read**
 
 | Key | Action |
 |---|---|
 | `j` / `k` | next / previous PR |
-| `g` / `G` | first / last PR |
-| `h` / `l` | previous / next section |
+| `gg` / `G` | first / last PR |
+| `H` / `L` | previous / next section (`h` / `l` too) |
 | `/` | filter the list |
-| `s` | search GitHub within the section |
-| `f` | cycle open / merged / closed / all |
-| `F` | toggle open ↔ all |
-| `u` | switch account |
-| `R` | reload from GitHub |
-| `S` | add / edit / delete / move sections, pin this repo |
-| `E` | edit the sections file |
-
-**Read**
-
-| Key | Action |
-|---|---|
 | `1` `2` `3` `4` | overview / diff / checks / comments |
 | `Tab` | next view |
 | `J` / `K` | scroll the preview down / up |
 | `Ctrl+d` / `Ctrl+u` | scroll half a page |
 | `Enter` | current view full screen (failed logs in checks) |
-| `b` | open in the browser |
+| `r` | reload from GitHub (`R` too) |
+| `o` | open in the browser (`b` too) |
 | `y` | copy the link |
+| `?` | show every key |
+| `q` / `Esc` | quit |
 
-**Act**
+**Leader (`Space`)**
 
 | Key | Action |
 |---|---|
-| `m` | merge panel |
-| `a` | approve |
-| `r` | request changes |
-| `c` | comment |
-| `x` | close / reopen |
-| `o` | check out the branch (in its clone) |
-| `d` | draft ↔ ready for review |
-| `?` | show every key |
-| `q` / `Esc` | quit |
+| `Space p m` | merge panel |
+| `Space p a` | approve |
+| `Space p r` | request changes |
+| `Space p c` | comment |
+| `Space p x` | close / reopen |
+| `Space p d` | draft ↔ ready for review |
+| `Space g b` | check out the branch (in its clone) |
+| `Space g a` | switch account |
+| `Space f f` | filter the list (as `/`) |
+| `Space f s` | cycle open / merged / closed / all |
+| `Space f a` | toggle open ↔ all (`F` too) |
+| `Space f g` | search GitHub within the section |
+| `Space f c` | clear the GitHub search |
+| `Space t 1`..`9` | go to section N |
+| `Space y y` | copy the link |
+| `Space o b` | open in the browser |
+| `Space , s` | add / edit / delete / move sections, pin this repo (`S` too) |
+| `Space , e` | edit the sections file (`E` too) |
+| `Space r` | reload from GitHub |
+| `Space Space` | palette of every leader action |
+| `Space ?` / `Space q` | show every key / quit |
+
+**Moved in 2.5.0.** The old one-letter actions moved under the leader. For
+one release, pressing an old key does nothing and the footer says where it
+went: `m` `a` `c` `x` `d` → `Space p …`, `u` → `Space g a`, `s` →
+`Space f g`, `f` → `Space f s`. `r` now reloads (request changes is
+`Space p r`) and `o` opens the browser (checkout is `Space g b`).
 
 The merge panel's own keys are listed under [Merging](#merging).
 
@@ -591,7 +606,7 @@ you answer says for a moment what that did:
 
 | Key | |
 |---|---|
-| `y` | approve: sangam does it and tells the agent |
+| `y` | approve: sangam does it and tells the agent (only `y` says yes) |
 | `n` / `Esc` | decline: nothing happens, the agent is told you declined |
 | `e` | edit the text in your editor first; the agent is told what was posted |
 | `u` | undo your edit |
