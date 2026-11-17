@@ -37,7 +37,8 @@ FAMILY = [
                     ("bhava", "भाव", "emoji"), ("tarang", "तरंग", "Wi‑Fi"), ("setu", "सेतु", "Bluetooth"),
                     ("doot", "दूत", "phone"), ("patra", "पात्र", "Docker"), ("akashvani", "आकाशवाणी", "notifications"),
                     ("raga", "राग", "YouTube"), ("mudra", "मुद्रा", "keybindings"), ("urja", "ऊर्जा", "battery"),
-                    ("vishram", "विश्राम", "power menu"), ("kendra", "केन्द्र", "quick settings")]),
+                    ("vishram", "विश्राम", "power menu"), ("kendra", "केन्द्र", "quick settings"),
+                    ("darpana", "दर्पण", "phone, mirrored")]),
 ]
 COLORS = {"rosewater": "#f5e0dc", "mauve": "#cba6f7", "red": "#f38ba8", "peach": "#fab387", "yellow": "#f9e2af",
           "green": "#a6e3a1", "teal": "#94e2d5", "sky": "#89dceb", "blue": "#89b4fa", "lavender": "#b4befe",
