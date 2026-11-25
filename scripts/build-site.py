@@ -7,6 +7,9 @@ out of date.
     python3 scripts/build-site.py           # write docs/
     python3 scripts/build-site.py --check   # exit 1 if docs/ would change
 
+site.toml may name an interactive demo (demo = "site/try.html"): it is
+copied to docs/try.html, and the nav and the hero link to it.
+
 Standard library only. The same file lives in every repository of the
 family (Vayu's tools): change it in one, copy it to all.
 """
@@ -19,19 +22,29 @@ import tomllib
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "docs")
 GH = "https://github.com/Theyashsawarkar"
-PAGES = "https://theyashsawarkar.github.io"
+# Every tool's site has its own address: https://<tool>.theyashsawarkar.dev/
+# (a CNAME record per tool, and docs/CNAME, which this writes).
+DOMAIN = "theyashsawarkar.dev"
+
+
+def home(n):
+    return f"https://{n}.{DOMAIN}/"
+
 
 # The family: every project with a site like this one.
 FAMILY = [
-    ("Desktop", [("vayu", "वायु", "the keyboard-driven Wayland desktop", "https://theyashsawarkar.github.io/vayu/")]),
+    ("Desktop", [("vayu", "वायु", "the keyboard-driven Wayland desktop")]),
     ("Apps", [("kosha", "कोश", "package manager"), ("nada", "नाद", "music player"),
-              ("drishya", "दृश्य", "video player"), ("sangam", "संगम", "pull requests in the terminal"),
+              ("drishya", "दृश्य", "video player"), ("darshan", "दर्शन", "document viewer"),
+              ("sangam", "संगम", "pull requests in the terminal"),
               ("narada", "नारद", "mail and chat in the terminal"), ("pattan", "पत्तन", "ports and tunnels"),
               ("nauka", "नौका", "Docker in the terminal"), ("vaikhari", "वैखरी", "posts to X and LinkedIn"),
               ("dvarapala", "द्वारपाल", "commands for AI agents, approved"), ("pramana", "प्रमाण", "password prompts"),
               ("vesha", "वेष", "Claude Code accounts"), ("vishvakarma", "विश्वकर्मा", "skills for every AI agent"),
-              ("ekatva", "एकत्व", "phone and laptop, linked"), ("varna", "वर्ण", "theme engine"),
-              ("vinyasa", "विन्यास", "settings")]),
+              ("sutradhar", "सूत्रधार", "browser hands for AI agents"),
+              ("ekatva", "एकत्व", "phone and laptop, linked"), ("vagdevi", "वाग्देवी", "book reader for Android"),
+              ("varna", "वर्ण", "theme engine"), ("vinyasa", "विन्यास", "settings"),
+              ("vyakarana", "व्याकरण", "key grammar")]),
     ("Vyom", [("vyom", "व्योम", "panels runtime")]),
     ("Vyom tools", [("dvara", "द्वार", "apps"), ("ganit", "गणित", "calculator"), ("smriti", "स्मृति", "clipboard"),
                     ("bhava", "भाव", "emoji"), ("tarang", "तरंग", "Wi‑Fi"), ("setu", "सेतु", "Bluetooth"),
@@ -41,7 +54,7 @@ FAMILY = [
                     ("darpana", "दर्पण", "phone, mirrored")]),
 ]
 COLORS = {"rosewater": "#f5e0dc", "mauve": "#cba6f7", "red": "#f38ba8", "peach": "#fab387", "yellow": "#f9e2af",
-          "green": "#a6e3a1", "teal": "#94e2d5", "sky": "#89dceb", "blue": "#89b4fa", "lavender": "#b4befe",
+          "green": "#a6e3a1", "teal": "#94e2d5", "sky": "#89dceb", "sapphire": "#74c7ec", "blue": "#89b4fa", "lavender": "#b4befe",
           "pink": "#f5c2e7", "rose": "#f5c2e7"}
 
 
@@ -289,6 +302,8 @@ def page(meta, title, body, depth=0, active="", toc=None, hero=""):
     accent = COLORS.get(meta.get("color", "mauve"), "#cba6f7")
     nav = [("Overview", f"{up}index.html", "home"), ("Changelog", f"{up}changelog.html", "changelog"),
            ("Decisions", f"{up}adr/index.html", "adr")]
+    if meta.get("demo"):  # an interactive demo: try it in the browser
+        nav.insert(1, ("Try it", f"{up}try.html", "try"))
     navhtml = "".join(f'<a href="{h}" class="{"on" if k == active else ""}{" hide" if k == "adr" else ""}">{t}</a>' for t, h, k in nav)
     navhtml += f'<a class="gh" href="{GH}/{name}">GitHub ↗</a>'
     tochtml = ""
@@ -300,7 +315,7 @@ def page(meta, title, body, depth=0, active="", toc=None, hero=""):
         links = []
         for it in items:
             n, sa, what = it[0], it[1], it[2]
-            url = it[3] if len(it) > 3 else f"{PAGES}/{n}/"
+            url = it[3] if len(it) > 3 else home(n)
             links.append(f'<a href="{url}" class="{"me" if n == name else ""}">{n} <span>{sa} · {what}</span></a>')
         fam.append(f"<div><h4>{group}</h4>{''.join(links)}</div>")
     desc = html.escape(meta["tagline"], quote=True)
@@ -329,7 +344,7 @@ def page(meta, title, body, depth=0, active="", toc=None, hero=""):
 {body}
 </article></div>
 <footer><div class="in">{''.join(fam)}</div>
-<div class="bottom">{name} is free software under the MIT license · <a href="{GH}/{name}">source</a> · <a href="{GH}/{name}/issues">issues</a> · <a href="{up}changelog.html">changelog</a> · part of <a href="https://theyashsawarkar.github.io/vayu/">Vayu</a></div></footer>
+<div class="bottom">{name} is free software under the MIT license · <a href="{GH}/{name}">source</a> · <a href="{GH}/{name}/issues">issues</a> · <a href="{up}changelog.html">changelog</a> · part of <a href="{home('vayu')}">Vayu</a></div></footer>
 <script>{JS}</script>
 </body>
 </html>
@@ -386,6 +401,8 @@ def build():
         if os.path.exists(src):
             files[os.path.join("assets", rel[len("assets/"):])] = open(src, "rb").read()
     files["assets/site.css"] = CSS.strip().encode()
+    # GitHub Pages serves the site at its own address (a CNAME record points it there).
+    files["CNAME"] = f"{name}.{DOMAIN}\n".encode()
 
     # ---- home: the README without its banner/badges block (the hero has the shloka)
     readme = re.sub(r"(?s)<!-- identity -->.*?<!-- /identity -->\s*", "", readme)
@@ -413,7 +430,7 @@ def build():
 <h1>{name}</h1>
 <div class="sa">{meta.get("sanskrit", "")} <span>· “{html.escape(meta.get("meaning", ""))}”</span></div>
 <p class="lead">{html.escape(meta["tagline"])}</p>
-{shloka}<div class="cta"><a class="btn primary" href="#install">Install</a><a class="btn" href="{GH}/{name}">GitHub ↗</a>
+{shloka}<div class="cta">{'<a class="btn primary" href="try.html">Try it in your browser</a>' if meta.get("demo") else ""}<a class="btn{"" if meta.get("demo") else " primary"}" href="#install">Install</a><a class="btn" href="{GH}/{name}">GitHub ↗</a>
 <a class="btn" href="changelog.html">What's new{(' in ' + latest) if latest else ''}</a></div>
 <div class="meta"><span><b>{latest or 'unreleased'}</b> latest</span><span><b>{len([v for v in vers if v[0] != 'Unreleased'])}</b> releases</span><span><b>{len(adrs)}</b> decisions recorded</span><span><b>MIT</b> license</span></div>
 </div><img class="logo" src="assets/logo.svg" alt="{name} logo"></div></section>"""
@@ -461,6 +478,9 @@ def build():
                  "A decision is never edited away: a later one supersedes it. Sources: "
                  f"<a href=\"{GH}/{name}/tree/main/docs/adr\">docs/adr</a>.</p>")
     files[os.path.join("adr", "index.html")] = page(meta, f"Decisions · {name}", adr_intro + f'<div class="cards">{"".join(cards)}</div>', 1, "adr").encode()
+    # ---- the demo: a page of its own (site.toml demo = "path"), copied as is
+    if meta.get("demo"):
+        files["try.html"] = open(os.path.join(ROOT, meta["demo"]), "rb").read()
     files[".nojekyll"] = b""
     return files
 
