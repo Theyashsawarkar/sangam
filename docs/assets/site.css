@@ -96,5 +96,6 @@ footer .bottom{max-width:1240px;margin:0 auto;padding:0 24px 32px;color:var(--ov
 footer .bottom a{display:inline;padding:0;font-size:13px;text-decoration:underline}
 @media(max-width:900px){.wrap{grid-template-columns:1fr}.toc{display:none}.hero .in{grid-template-columns:1fr}.hero .logo{width:112px;height:112px;order:-1}
 .top nav a:not(.gh){padding:6px 9px}}
-@media(max-width:560px){.top{padding:0 10px}.top .in{gap:10px;padding-left:12px}.brand small{display:none}.top nav a.hide{display:none}.hero .in{padding:52px 16px 36px}.wrap{padding:28px 16px 64px}}
+@media(max-width:560px){.top{padding:0 10px}.top .in{gap:8px;padding-left:12px}.brand small{display:none}.top nav a.hide{display:none}
+.top nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:2px}.top nav::-webkit-scrollbar{display:none}.top nav a{padding:6px 10px;font-size:14px;white-space:nowrap}.hero .in{padding:52px 16px 36px}.wrap{padding:28px 16px 64px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
