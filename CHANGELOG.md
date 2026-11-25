@@ -2,6 +2,10 @@
 
 Newest first.
 
+## Unreleased
+
+- The website has Vayu's Spatial look: graphite glass, a floating navigation bar, near-white for links and the main button, and the tool's own colour only as its signature (the logo's glow, the shloka's line, the release dots). No more all-caps labels.
+
 ## v2.5.0 -- 2026-11-09
 
 - **Vim keys with `Space` as the leader**, grouped like every Vayu tool:
