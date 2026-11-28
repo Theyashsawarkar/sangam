@@ -42,6 +42,7 @@ FAMILY = [
               ("dvarapala", "द्वारपाल", "commands for AI agents, approved"), ("pramana", "प्रमाण", "password prompts"),
               ("vesha", "वेष", "Claude Code accounts"), ("vishvakarma", "विश्वकर्मा", "skills for every AI agent"),
               ("sutradhar", "सूत्रधार", "browser hands for AI agents"),
+              ("pranali", "प्रणाली", "one pipe from agents to tools"),
               ("ekatva", "एकत्व", "phone and laptop, linked"), ("vagdevi", "वाग्देवी", "book reader for Android"),
               ("varna", "वर्ण", "theme engine"), ("vinyasa", "विन्यास", "settings"),
               ("vyakarana", "व्याकरण", "key grammar")]),
@@ -361,9 +362,10 @@ def page(meta, title, body, depth=0, active="", toc=None, hero="", shot=""):
     for group, items in FAMILY:
         links = []
         for it in items:
-            n, sa, what = it[0], it[1], it[2]
+            n, what = it[0], it[2]
             url = it[3] if len(it) > 3 else home(n)
-            links.append(f'<a href="{url}" class="{"me" if n == name else ""}"{' aria-current="page"' if n == name else ""}>{n} <span>{what}</span></a>')
+            me, cur = ("me", ' aria-current="page"') if n == name else ("", "")
+            links.append(f'<a href="{url}" class="{me}"{cur}>{n} <span>{what}</span></a>')
         cls = " g2" if len(items) > 8 else ""
         fam.append(f'<div class="{cls.strip()}"><h4>{group}</h4><div class="list">{"".join(links)}</div></div>')
     desc = html.escape(meta["tagline"], quote=True)
@@ -488,7 +490,8 @@ def build():
     shot_src = attr(hero_imgs[0], "src") if hero_imgs else ""
     shot_html = ""
     if hero_imgs:
-        imgs = "".join(f'<img src="{attr(t, "src")}" alt="{attr(t, "alt")}"{" fetchpriority=\"high\"" if k == 0 else " loading=\"lazy\""}>'
+        first, rest = ' fetchpriority="high"', ' loading="lazy"'
+        imgs = "".join(f'<img src="{attr(t, "src")}" alt="{attr(t, "alt")}"{first if k == 0 else rest}>'
                        for k, t in enumerate(hero_imgs))
         shot_html = f'<figure class="shot{" many" if len(hero_imgs) > 1 else ""}">{imgs}</figure>'
     releases = len([v for v in vers if v[0] != 'Unreleased'])
